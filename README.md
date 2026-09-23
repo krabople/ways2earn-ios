@@ -30,9 +30,9 @@ npx expo-doctor
 The GitHub Actions workflow uses EAS Build. It requires:
 
 - an Expo/EAS project linked in `app.config.ts`;
-- repository secrets `EXPO_TOKEN` and `EXPO_PROJECT_ID`;
+- repository secrets `EXPO_TOKEN`, `EXPO_PROJECT_ID` and the numeric `ASC_APP_ID`;
 - Apple distribution credentials configured for bundle ID `com.krabople.ways2earn`.
 
-After those one-time owner-authenticated steps, run **Build signed iOS IPA** from GitHub Actions. The workflow waits for the signed build and attaches `Ways2Earn.ipa` as a private workflow artifact.
+After those one-time owner-authenticated steps, run **Build signed iOS IPA** from GitHub Actions. The workflow waits for the signed build, attaches `Ways2Earn.ipa` as a private workflow artifact and uploads the same build to TestFlight. It does not submit the app for public App Review.
 
 See [APP-STORE-READINESS.md](APP-STORE-READINESS.md) before TestFlight or App Review.
