@@ -1,56 +1,38 @@
-# Welcome to your Expo app 👋
+# Ways2Earn for iOS
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A native Expo/React Native client for the Ways2Earn community. It shares the live Ways2Earn database through a purpose-built bearer-token API; it is not a web wrapper.
 
-## Get started
+## Native product areas
 
-1. Install dependencies
+- Earn, freebie and deal discovery with search, categories, weighted voting and saved posts
+- Opportunity detail, trust information, outcomes, progress, comments, reactions, reporting and native sharing
+- Community discussions and replies
+- Member messages, alerts and email-alert preferences
+- Private earnings tracker
+- Type-aware opportunity submission with linked or uploaded images
+- Optional push notifications with deep links
+- In-app account closure with password and exact-phrase safeguards
+- Affiliate disclosure before opening an external source in an iOS browser sheet
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Local checks
 
 ```bash
-npm run reset-project
+npm ci
+npm run lint
+npx tsc --noEmit
+npx expo-doctor
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+`EXPO_PUBLIC_API_ORIGIN` defaults to `https://www.ways2earn.com`.
 
-### Other setup steps
+## Signed iOS builds
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+The GitHub Actions workflow uses EAS Build. It requires:
 
-## Learn more
+- an Expo/EAS project linked in `app.config.ts`;
+- repository secrets `EXPO_TOKEN` and `EXPO_PROJECT_ID`;
+- Apple distribution credentials configured for bundle ID `com.krabople.ways2earn`.
 
-To learn more about developing your project with Expo, look at the following resources:
+After those one-time owner-authenticated steps, run **Build signed iOS IPA** from GitHub Actions. The workflow waits for the signed build and attaches `Ways2Earn.ipa` as a private workflow artifact.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+See [APP-STORE-READINESS.md](APP-STORE-READINESS.md) before TestFlight or App Review.
