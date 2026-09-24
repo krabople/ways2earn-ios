@@ -3,7 +3,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Screen } from '@/components/screen';
 import { colours, radius, spacing } from '@/lib/theme';
@@ -31,7 +31,7 @@ export default function AccountScreen() {
 }
 
 function Row({ title, subtitle, onPress }: { title: string; subtitle: string; onPress: () => void }) { return <Pressable onPress={onPress} style={styles.row}><View style={styles.rowCopy}><Text style={styles.rowTitle}>{title}</Text><Text style={styles.help}>{subtitle}</Text></View><Text style={styles.chevron}>›</Text></Pressable>; }
-function LegalLinks() { return <View style={styles.legal}><Pressable onPress={() => void Linking.openURL('https://www.ways2earn.com/privacy')}><Text style={styles.link}>Privacy policy</Text></Pressable><Pressable onPress={() => void Linking.openURL('https://www.ways2earn.com/trust')}><Text style={styles.link}>Trust centre & community rules</Text></Pressable><Pressable onPress={() => void Linking.openURL('https://www.ways2earn.com/support')}><Text style={styles.link}>Contact support</Text></Pressable></View>; }
+function LegalLinks() { return <View style={styles.legal}><Pressable onPress={() => router.push('/privacy' as never)}><Text style={styles.link}>Privacy policy</Text></Pressable><Pressable onPress={() => router.push('/trust' as never)}><Text style={styles.link}>Trust centre & community rules</Text></Pressable><Pressable onPress={() => router.push('/support' as never)}><Text style={styles.link}>Contact support</Text></Pressable></View>; }
 
 const styles = StyleSheet.create({
   hero: { padding: spacing.xl, borderRadius: radius.lg, backgroundColor: colours.navy, gap: spacing.md }, heroTitle: { color: 'white', fontSize: 25, fontWeight: '900' }, help: { color: colours.slate, fontSize: 12, lineHeight: 18 },
