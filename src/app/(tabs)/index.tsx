@@ -21,6 +21,7 @@ export default function DiscoverScreen() {
   const [type, setType] = useState<(typeof types)[number]>("Earn");
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
+  const [showExpired, setShowExpired] = useState(false);
   const categories = useMemo(
     () => [
       "All",
@@ -37,13 +38,14 @@ export default function DiscoverScreen() {
       (feed?.opportunities ?? []).filter(
         (item) =>
           item.type === type &&
+          (showExpired || item.status !== "expired") &&
           (category === "All" || item.category === category) &&
           (!query.trim() ||
             `${item.title} ${item.summary} ${item.merchant}`
               .toLowerCase()
               .includes(query.trim().toLowerCase())),
       ),
-    [category, feed, query, type],
+    [category, feed, query, showExpired, type],
   );
 
   return (
@@ -114,6 +116,22 @@ export default function DiscoverScreen() {
           </Pressable>
         ))}
       </ScrollView>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: showExpired }}
+        onPress={() => setShowExpired((current) => !current)}
+        style={styles.expiredControl}
+      >
+        <View style={[styles.checkbox, showExpired && styles.checkboxChecked]}>
+          {showExpired ? <Text style={styles.checkmark}>✓</Text> : null}
+        </View>
+        <View style={styles.expiredCopy}>
+          <Text style={styles.expiredLabel}>Show expired posts</Text>
+          <Text style={styles.expiredHint}>
+            Include older opportunities that are no longer active.
+          </Text>
+        </View>
+      </Pressable>
       {error ? <MessageState title="Unable to refresh" body={error} /> : null}
       <View style={styles.list}>
         {items.map((item) => (
@@ -187,5 +205,35 @@ const styles = StyleSheet.create({
   chipActive: { borderColor: colours.mint, backgroundColor: colours.mintPale },
   chipText: { color: colours.slate, fontSize: 12, fontWeight: "700" },
   chipTextActive: { color: colours.green },
+  expiredControl: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: colours.line,
+    borderRadius: radius.md,
+    backgroundColor: colours.surface,
+  },
+  checkbox: {
+    width: 23,
+    height: 23,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#AAB8C2",
+    borderRadius: 6,
+    backgroundColor: colours.surface,
+  },
+  checkboxChecked: {
+    borderColor: colours.green,
+    backgroundColor: colours.green,
+  },
+  checkmark: { color: "white", fontSize: 15, fontWeight: "900" },
+  expiredCopy: { flex: 1, minWidth: 0 },
+  expiredLabel: { color: colours.ink, fontSize: 13, fontWeight: "800" },
+  expiredHint: { color: colours.slate, fontSize: 10, marginTop: 2 },
   list: { gap: spacing.md },
 });

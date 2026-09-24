@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { RichComposer } from "@/components/rich-composer";
+import { CommunityBody, plainCommunityText } from "@/components/community-body";
 import { Screen } from "@/components/screen";
 import { MessageState } from "@/components/states";
 import { request } from "@/lib/api";
@@ -83,7 +84,7 @@ export default function MessagesScreen() {
                   {item.participants || item.subject}
                 </Text>
                 <Text numberOfLines={1} style={styles.preview}>
-                  {plain(item.last_body || item.subject)}
+                  {plainCommunityText(item.last_body || item.subject)}
                 </Text>
                 <Text style={styles.time}>
                   {item.last_message_at ? age(item.last_message_at) : ""}
@@ -129,7 +130,7 @@ export default function MessagesScreen() {
               </Text>
               <Text style={styles.time}>{age(message.created_at)}</Text>
             </View>
-            <Text style={styles.messageBody}>{plain(message.body)}</Text>
+            <CommunityBody body={message.body} style={styles.messageBody} />
           </View>
         ))}
       </View>
@@ -155,13 +156,6 @@ export default function MessagesScreen() {
   );
 }
 
-function plain(body: string) {
-  return body
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "🖼 $1")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
-    .replace(/[*_\\]/g, "")
-    .trim();
-}
 const styles = StyleSheet.create({
   list: { gap: spacing.sm },
   conversation: {

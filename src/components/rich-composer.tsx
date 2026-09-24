@@ -1,9 +1,18 @@
 import * as ImagePicker from "expo-image-picker";
+import { Image as ExpoImage } from "expo-image";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
-import { request, uploadImage } from "@/lib/api";
+import { assetUrl, request, uploadImage } from "@/lib/api";
+import { communityEmojis } from "@/lib/community-emojis";
 import { colours, radius, spacing } from "@/lib/theme";
 
 type MemberHit = { handle: string; name: string };
@@ -51,13 +60,13 @@ export function RichComposer({
     );
   }, [value]);
 
-  function command(name: string, argument = "") {
+  function command(name: string, argument: unknown = "") {
     web.current?.injectJavaScript(
       `window.w2eCommand(${JSON.stringify(name)}, ${JSON.stringify(argument)}); true;`,
     );
   }
 
-  async function image() {
+  async function chooseImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.82,
@@ -96,15 +105,39 @@ export function RichComposer({
         <Tool label="B" onPress={() => command("bold")} bold />
         <Tool label="I" onPress={() => command("italic")} italic />
         <Tool label="Link" onPress={() => command("link")} />
-        <Tool label="Image" onPress={() => void image()} disabled={uploading} />
-        {["👍", "😂", "🔥", "💡", "🎉"].map((emoji) => (
-          <Tool
-            key={emoji}
-            label={emoji}
-            onPress={() => command("text", emoji)}
-          />
-        ))}
+        <Tool
+          label="Image"
+          onPress={() => void chooseImage()}
+          disabled={uploading}
+        />
       </View>
+      <ScrollView
+        horizontal
+        keyboardShouldPersistTaps="handled"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.emojiTray}
+      >
+        {communityEmojis.map((emoji) => (
+          <Pressable
+            key={emoji.id}
+            accessibilityLabel={emoji.label}
+            onPress={() =>
+              command("customEmoji", {
+                token: emoji.token,
+                src: assetUrl(emoji.src),
+                label: emoji.label,
+              })
+            }
+            style={styles.emojiButton}
+          >
+            <ExpoImage
+              source={assetUrl(emoji.src)}
+              contentFit="contain"
+              style={styles.emojiImage}
+            />
+          </Pressable>
+        ))}
+      </ScrollView>
       <WebView
         ref={web}
         originWhitelist={["*"]}
@@ -168,18 +201,31 @@ function Tool({
 }
 
 function editorHtml(markdown: string, placeholder: string) {
-  const escaped = markdown
+  let escaped = markdown
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\n/g, "<br>");
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#102a46;font:16px -apple-system,BlinkMacSystemFont,sans-serif}#editor{min-height:118px;padding:13px;outline:0;line-height:1.5}#editor:empty:before{content:attr(data-placeholder);color:#728397}img{max-width:100%;height:auto;border-radius:8px}a{color:#00845f}</style></head><body><div id="editor" contenteditable="true" data-placeholder="${placeholder.replace(/"/g, "&quot;")}">${escaped}</div><script>
+  const emojiData = communityEmojis.map((emoji) => ({
+    ...emoji,
+    src: assetUrl(emoji.src),
+  }));
+  emojiData.forEach((emoji) => {
+    escaped = escaped
+      .split(emoji.token)
+      .join(
+        `<img class="w2e-emoji" data-token="${emoji.token}" src="${emoji.src}" alt="${emoji.label}">`,
+      );
+  });
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#102a46;font:16px -apple-system,BlinkMacSystemFont,sans-serif}#editor{min-height:118px;padding:13px;outline:0;line-height:1.5}#editor:empty:before{content:attr(data-placeholder);color:#728397}img{max-width:100%;height:auto;border-radius:8px}.w2e-emoji{display:inline-block;width:34px;height:34px;object-fit:contain;vertical-align:middle;margin:0 2px;border-radius:0}a{color:#00845f}</style></head><body><div id="editor" contenteditable="true" data-placeholder="${placeholder.replace(/"/g, "&quot;")}">${escaped}</div><script>
   const editor=document.getElementById('editor');
-  function md(node){if(node.nodeType===3)return node.nodeValue||'';if(node.nodeType!==1)return '';const tag=node.tagName.toLowerCase(),inner=[...node.childNodes].map(md).join('');if(tag==='strong'||tag==='b')return '**'+inner+'**';if(tag==='em'||tag==='i')return '_'+inner+'_';if(tag==='a')return '['+inner+']('+node.getAttribute('href')+')';if(tag==='img')return '!['+(node.getAttribute('alt')||'Image')+']('+node.getAttribute('src')+')';if(tag==='br')return '\\n';if(['div','p'].includes(tag))return inner+'\\n';return inner}
+  const emojis=${JSON.stringify(emojiData)};
+  function render(value){let html=(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>');emojis.forEach(e=>{html=html.split(e.token).join('<img class="w2e-emoji" data-token="'+e.token+'" src="'+e.src+'" alt="'+e.label+'">')});return html}
+  function md(node){if(node.nodeType===3)return node.nodeValue||'';if(node.nodeType!==1)return '';const tag=node.tagName.toLowerCase(),inner=[...node.childNodes].map(md).join('');if(tag==='strong'||tag==='b')return '**'+inner+'**';if(tag==='em'||tag==='i')return '_'+inner+'_';if(tag==='a')return '['+inner+']('+node.getAttribute('href')+')';if(tag==='img'&&node.dataset.token)return node.dataset.token;if(tag==='img')return '!['+(node.getAttribute('alt')||'Image')+']('+node.getAttribute('src')+')';if(tag==='br')return '\\n';if(['div','p'].includes(tag))return inner+'\\n';return inner}
   function emit(){const text=editor.innerText||'';const match=text.match(/(?:^|\\s)@([a-z0-9-]{1,30})$/i);window.ReactNativeWebView.postMessage(JSON.stringify({markdown:[...editor.childNodes].map(md).join('').replace(/\\n{3,}/g,'\\n\\n').trim(),mention:match?match[1]:''}))}
   editor.addEventListener('input',emit);editor.addEventListener('keyup',emit);editor.addEventListener('blur',emit);
-  window.w2eSet=(value)=>{editor.innerHTML=(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>')};
-  window.w2eCommand=(name,arg)=>{editor.focus();if(name==='link'){const url=prompt('Paste an https:// link');if(url&&/^https?:\\/\\//i.test(url))document.execCommand('createLink',false,url)}else if(name==='image'){document.execCommand('insertHTML',false,'<img src="'+arg.replace(/"/g,'&quot;')+'" alt="Uploaded image"><br>')}else if(name==='text'){document.execCommand('insertText',false,arg)}else if(name==='mention'){const sel=window.getSelection();if(sel&&sel.rangeCount){const range=sel.getRangeAt(0);const before=range.startContainer.nodeType===3?range.startContainer.nodeValue.slice(0,range.startOffset):'';const m=before.match(/@([a-z0-9-]*)$/i);if(m){range.setStart(range.startContainer,range.startOffset-m[0].length);range.deleteContents()}}document.execCommand('insertText',false,'@'+arg+' ')}else document.execCommand(name,false,null);emit()};
+  window.w2eSet=(value)=>{editor.innerHTML=render(value)};
+  window.w2eCommand=(name,arg)=>{editor.focus();if(name==='link'){const url=prompt('Paste an https:// link');if(url&&/^https?:\\/\\//i.test(url))document.execCommand('createLink',false,url)}else if(name==='image'){document.execCommand('insertHTML',false,'<img src="'+arg.replace(/"/g,'&quot;')+'" alt="Uploaded image"><br>')}else if(name==='customEmoji'){document.execCommand('insertHTML',false,'<img class="w2e-emoji" data-token="'+arg.token+'" src="'+arg.src+'" alt="'+arg.label+'">&nbsp;')}else if(name==='text'){document.execCommand('insertText',false,arg)}else if(name==='mention'){const sel=window.getSelection();if(sel&&sel.rangeCount){const range=sel.getRangeAt(0);const before=range.startContainer.nodeType===3?range.startContainer.nodeValue.slice(0,range.startOffset):'';const m=before.match(/@([a-z0-9-]*)$/i);if(m){range.setStart(range.startContainer,range.startOffset-m[0].length);range.deleteContents()}}document.execCommand('insertText',false,'@'+arg+' ')}else document.execCommand(name,false,null);emit()};
   </script></body></html>`;
 }
 
@@ -202,6 +248,25 @@ const styles = StyleSheet.create({
     borderBottomColor: colours.line,
     backgroundColor: "#F7FAF9",
   },
+  emojiTray: {
+    gap: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colours.line,
+    backgroundColor: "#F7FAF9",
+  },
+  emojiButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colours.line,
+    backgroundColor: colours.surface,
+  },
+  emojiImage: { width: 31, height: 31 },
   tool: {
     minWidth: 34,
     height: 32,

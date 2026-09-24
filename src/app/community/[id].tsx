@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
+import { CommunityBody } from "@/components/community-body";
 import { MessageState } from "@/components/states";
 import { colours, radius, spacing } from "@/lib/theme";
 import { age } from "@/lib/types";
@@ -28,7 +29,7 @@ export default function DiscussionScreen() {
         <Text style={styles.meta}>
           By @{topic.handle} · {age(topic.createdAt)}
         </Text>
-        <Text style={styles.body}>{topic.body}</Text>
+        <CommunityBody body={topic.body} style={styles.body} />
       </View>
       <Pressable
         style={styles.primary}

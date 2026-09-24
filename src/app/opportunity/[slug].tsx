@@ -7,6 +7,7 @@ import { Alert, Pressable, Share, StyleSheet, Text, View } from "react-native";
 
 import { MessageState } from "@/components/states";
 import { Screen } from "@/components/screen";
+import { CommunityBody } from "@/components/community-body";
 import { API_ORIGIN, assetUrl } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import { age } from "@/lib/types";
@@ -162,7 +163,7 @@ export default function OpportunityScreen() {
       </View>
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>How it works</Text>
-        <Text style={styles.body}>{plain(item.body)}</Text>
+        <CommunityBody body={item.body} style={styles.body} />
       </View>
       <View style={styles.trust}>
         <Text style={styles.trustKicker}>COMMUNITY CHECKS</Text>
@@ -205,13 +206,6 @@ export default function OpportunityScreen() {
   );
 }
 
-function plain(body: string) {
-  return body
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1 ($2)")
-    .replace(/[*_\\]/g, "")
-    .trim();
-}
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.fact}>

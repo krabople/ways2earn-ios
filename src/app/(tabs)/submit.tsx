@@ -66,6 +66,7 @@ export default function SubmitScreen() {
   const [url, setUrl] = useState("");
   const [category, setCategory] = useState("Miscellaneous");
   const [reward, setReward] = useState("");
+  const [effort, setEffort] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [image, setImage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -105,7 +106,7 @@ export default function SubmitScreen() {
           category,
           reward,
           spend: type === "Freebie" ? "£0" : "See source",
-          effort: type === "Earn" ? "Varies" : "Quick",
+          effort,
           eligibility: "See source for current eligibility",
           payout: type === "Earn" ? "See source" : "Not applicable",
           disclosure: "None",
@@ -120,6 +121,7 @@ export default function SubmitScreen() {
       setSteps("");
       setUrl("");
       setReward("");
+      setEffort("");
       setImage("");
       setImageUrl("");
       Alert.alert(
@@ -408,7 +410,15 @@ export default function SubmitScreen() {
               }
               value={reward}
               onChangeText={setReward}
+              maxLength={60}
               placeholder="e.g. £25 or £10/month"
+            />
+            <Field
+              label={type === "Earn" ? "Time needed" : "Time to claim"}
+              value={effort}
+              onChangeText={setEffort}
+              maxLength={50}
+              placeholder="e.g. 5 minutes or Varies"
             />
             <View style={styles.field}>
               <Text style={styles.label}>Post image</Text>
@@ -454,7 +464,8 @@ export default function SubmitScreen() {
                 summary.length < 30 ||
                 steps.length < 30 ||
                 !url.startsWith("http") ||
-                reward.trim().length < 1
+                reward.trim().length < 1 ||
+                effort.trim().length < 1
               }
               onPress={() => void submit()}
               style={[
@@ -464,7 +475,8 @@ export default function SubmitScreen() {
                   summary.length < 30 ||
                   steps.length < 30 ||
                   !url.startsWith("http") ||
-                  reward.trim().length < 1) &&
+                  reward.trim().length < 1 ||
+                  effort.trim().length < 1) &&
                   styles.disabled,
               ]}
             >

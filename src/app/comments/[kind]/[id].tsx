@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { RichComposer } from "@/components/rich-composer";
+import { CommunityBody } from "@/components/community-body";
 import { Screen } from "@/components/screen";
 import { MessageState } from "@/components/states";
 import { request } from "@/lib/api";
@@ -87,7 +88,7 @@ export default function CommentsScreen() {
                     @{comment.handle} · {age(comment.createdAt)}
                   </Text>
                 </View>
-                <Text style={styles.body}>{plain(comment.body)}</Text>
+                <CommunityBody body={comment.body} style={styles.body} />
                 <View style={styles.actions}>
                   <Pressable onPress={() => setReplyTo(comment)}>
                     <Text style={styles.action}>Reply</Text>
@@ -205,13 +206,6 @@ export default function CommentsScreen() {
   );
 }
 
-function plain(body: string) {
-  return body
-    .replace(/!\[[^\]]*\]\(([^)]+)\)/g, "🖼 Image")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1")
-    .replace(/[*_\\]/g, "")
-    .trim();
-}
 const styles = StyleSheet.create({
   list: { gap: spacing.md },
   comment: {

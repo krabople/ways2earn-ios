@@ -67,10 +67,18 @@ export function OpportunityCard({ item }: { item: Opportunity }) {
               {item.summary}
             </Text>
             <View style={styles.footer}>
-              <Text style={styles.reward}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={styles.reward}
+              >
                 {item.reward || item.requiredSpend || "View details"}
               </Text>
-              <Text style={styles.meta}>
+              <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={styles.footerMeta}
+              >
                 ◷ {item.effort || "Varies"} · ◯ {item.comments}
               </Text>
             </View>
@@ -84,6 +92,7 @@ export function OpportunityCard({ item }: { item: Opportunity }) {
 const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
+    alignItems: "stretch",
     backgroundColor: colours.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -118,7 +127,14 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0.7,
   },
-  main: { flex: 1, minWidth: 0, flexDirection: "row", gap: spacing.md },
+  main: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 112,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+  },
   image: {
     width: 92,
     height: 92,
@@ -127,7 +143,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colours.line,
   },
-  copy: { flex: 1, minWidth: 0, gap: 4 },
+  copy: { flex: 1, minWidth: 0, alignSelf: "stretch", gap: 4 },
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -143,16 +159,16 @@ const styles = StyleSheet.create({
   },
   summary: { color: colours.slate, fontSize: 12, lineHeight: 17 },
   footer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: spacing.sm,
-    marginTop: 3,
+    minWidth: 0,
+    gap: 2,
+    marginTop: "auto",
+    paddingTop: 3,
   },
   reward: {
-    flexShrink: 1,
+    width: "100%",
     color: colours.green,
     fontSize: 13,
     fontWeight: "800",
   },
+  footerMeta: { width: "100%", color: colours.slate, fontSize: 11 },
 });

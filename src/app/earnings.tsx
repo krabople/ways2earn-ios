@@ -31,6 +31,15 @@ const money = (minor: number) =>
   new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
     minor / 100,
   );
+const chartMoney = (minor: number) =>
+  money(minor)
+    .replace(/\.00$/, "")
+    .replace(/(\.\d)0$/, "$1");
+const day = 86_400_000;
+
+function earningTime(item: Earning) {
+  return new Date(`${item.earned_on}T12:00:00`).getTime();
+}
 
 export default function EarningsScreen() {
   const { action } = useApp();
@@ -63,23 +72,72 @@ export default function EarningsScreen() {
     () => filtered.reduce((sum, item) => sum + Number(item.amount_minor), 0),
     [filtered],
   );
-  const months = useMemo(() => {
-    const result: { label: string; amount: number }[] = [];
-    for (let offset = 5; offset >= 0; offset--) {
-      const date = new Date();
-      date.setDate(1);
-      date.setMonth(date.getMonth() - offset);
-      const key = date.toISOString().slice(0, 7);
-      result.push({
-        label: date.toLocaleDateString("en-GB", { month: "short" }),
-        amount: items
-          .filter((item) => item.earned_on.startsWith(key))
-          .reduce((sum, item) => sum + Number(item.amount_minor), 0),
+  const chartData = useMemo(() => {
+    const totalBetween = (start: number, end: number) =>
+      filtered
+        .filter((item) => {
+          const when = earningTime(item);
+          return when >= start && when < end;
+        })
+        .reduce((sum, item) => sum + Number(item.amount_minor), 0);
+
+    if (range === "30d" || range === "90d") {
+      const bucketDays = range === "30d" ? 5 : 15;
+      const start = openedAt - bucketDays * 6 * day;
+      return Array.from({ length: 6 }, (_, index) => {
+        const bucketStart = start + index * bucketDays * day;
+        const bucketEnd = bucketStart + bucketDays * day;
+        return {
+          label: new Date(bucketStart).toLocaleDateString("en-GB", {
+            day: "numeric",
+            month: "short",
+          }),
+          amount: totalBetween(bucketStart, bucketEnd),
+        };
       });
     }
-    return result;
-  }, [items]);
-  const maximum = Math.max(1, ...months.map((month) => month.amount));
+
+    const now = new Date(openedAt);
+    const first = filtered.length
+      ? new Date(Math.min(...filtered.map(earningTime)))
+      : now;
+    const monthSpan =
+      (now.getFullYear() - first.getFullYear()) * 12 +
+      now.getMonth() -
+      first.getMonth() +
+      1;
+
+    if (range === "year" || monthSpan <= 12) {
+      const startMonth = range === "year" ? 0 : first.getMonth();
+      const startYear =
+        range === "year" ? now.getFullYear() : first.getFullYear();
+      const count =
+        (now.getFullYear() - startYear) * 12 + now.getMonth() - startMonth + 1;
+      return Array.from({ length: count }, (_, index) => {
+        const start = new Date(startYear, startMonth + index, 1);
+        const end = new Date(startYear, startMonth + index + 1, 1);
+        return {
+          label: start.toLocaleDateString("en-GB", { month: "short" }),
+          amount: totalBetween(start.getTime(), end.getTime()),
+        };
+      });
+    }
+
+    return Array.from(
+      { length: now.getFullYear() - first.getFullYear() + 1 },
+      (_, index) => {
+        const year = first.getFullYear() + index;
+        return {
+          label: String(year),
+          amount: totalBetween(
+            new Date(year, 0, 1).getTime(),
+            new Date(year + 1, 0, 1).getTime(),
+          ),
+        };
+      },
+    );
+  }, [filtered, openedAt, range]);
+  const maximum = Math.max(1, ...chartData.map((point) => point.amount));
   async function add() {
     const amountMinor = Math.round(Number(amount) * 100);
     if (!title.trim() || !Number.isFinite(amountMinor) || amountMinor <= 0)
@@ -153,23 +211,35 @@ export default function EarningsScreen() {
       </View>
       <View style={styles.chart}>
         <View style={styles.chartHeader}>
-          <Text style={styles.section}>Last six months</Text>
-          <Text style={styles.meta}>Monthly totals</Text>
+          <Text style={styles.section}>
+            {ranges.find(([key]) => key === range)?.[1]} breakdown
+          </Text>
+          <Text style={styles.meta}>Tap a range to update</Text>
         </View>
         <View style={styles.bars}>
-          {months.map((month) => (
-            <View key={month.label} style={styles.barColumn}>
+          {chartData.map((point, index) => (
+            <View key={`${point.label}-${index}`} style={styles.barColumn}>
+              <Text
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+                numberOfLines={1}
+                style={styles.barValue}
+              >
+                {chartMoney(point.amount)}
+              </Text>
               <View style={styles.barTrack}>
                 <View
                   style={[
                     styles.bar,
                     {
-                      height: `${Math.max(month.amount ? 8 : 0, (month.amount / maximum) * 100)}%`,
+                      height: `${Math.max(point.amount ? 8 : 0, (point.amount / maximum) * 100)}%`,
                     },
                   ]}
                 />
               </View>
-              <Text style={styles.barLabel}>{month.label}</Text>
+              <Text numberOfLines={1} style={styles.barLabel}>
+                {point.label}
+              </Text>
             </View>
           ))}
         </View>
@@ -262,7 +332,7 @@ const styles = StyleSheet.create({
   statLabel: { color: "#C8D7E3", fontSize: 10 },
   private: { color: "#C8D7E3", fontSize: 11, marginTop: spacing.sm },
   chart: {
-    height: 230,
+    height: 250,
     padding: spacing.lg,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -301,6 +371,13 @@ const styles = StyleSheet.create({
     minHeight: 2,
     borderRadius: 5,
     backgroundColor: colours.mint,
+  },
+  barValue: {
+    width: "100%",
+    color: colours.ink,
+    fontSize: 9,
+    fontWeight: "800",
+    textAlign: "center",
   },
   barLabel: { color: colours.slate, fontSize: 9 },
   form: {
