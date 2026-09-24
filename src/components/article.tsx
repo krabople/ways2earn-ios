@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
   section: { gap: spacing.md, padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, borderColor: colours.line, backgroundColor: colours.surface },
   green: { borderColor: '#C4E7DA', backgroundColor: colours.mintPale },
   navy: { borderColor: colours.navy, backgroundColor: colours.navy },
-  heading: { color: colours.ink, fontSize: 19, lineHeight: 25, fontWeight: '850' },
+  heading: { color: colours.ink, fontSize: 19, lineHeight: 25, fontWeight: '800' },
   white: { color: 'white' },
   copy: { gap: spacing.md },
   paragraph: { color: colours.slate, fontSize: 14, lineHeight: 22 },

@@ -46,5 +46,5 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 145, paddingTop: 13, textAlignVertical: 'top' }, chips: { gap: spacing.sm },
   chip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: radius.pill, borderWidth: 1, borderColor: colours.line, backgroundColor: colours.surface },
   chipActive: { borderColor: colours.green, backgroundColor: colours.mintPale }, chipText: { color: colours.slate, fontSize: 12, fontWeight: '700' }, chipTextActive: { color: colours.green },
-  primary: { minHeight: 49, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colours.green }, primaryText: { color: 'white', fontWeight: '850' }, disabled: { opacity: 0.45 },
+  primary: { minHeight: 49, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, borderRadius: radius.md, backgroundColor: colours.green }, primaryText: { color: 'white', fontWeight: '800' }, disabled: { opacity: 0.45 },
 });
