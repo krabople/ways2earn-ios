@@ -1,7 +1,6 @@
 import { Image, Text, type StyleProp, type TextStyle } from "react-native";
 
-import { assetUrl } from "@/lib/api";
-import { communityEmojis } from "@/lib/community-emojis";
+import { communityEmojiImage, communityEmojis } from "@/lib/community-emojis";
 
 const byToken = new Map<string, (typeof communityEmojis)[number]>(
   communityEmojis.map((emoji) => [emoji.token, emoji]),
@@ -35,7 +34,7 @@ export function CommunityBody({
           <Image
             key={`${emoji.id}-${index}`}
             accessibilityLabel={emoji.label}
-            source={{ uri: assetUrl(emoji.src) }}
+            source={communityEmojiImage(emoji.id)}
             resizeMode="contain"
             style={{ width: 28, height: 28 }}
           />

@@ -72,3 +72,22 @@ export const communityEmojis = [
     src: "/emojis/welcome.svg",
   },
 ] as const;
+
+const nativeImages = {
+  paid: require("../../assets/images/paid.png"),
+  bargain: require("../../assets/images/bargain.png"),
+  thanks: require("../../assets/images/thanks.png"),
+  idea: require("../../assets/images/idea.png"),
+  worked: require("../../assets/images/worked.png"),
+  question: require("../../assets/images/question.png"),
+  caution: require("../../assets/images/caution.png"),
+  expired: require("../../assets/images/expired.png"),
+  celebrate: require("../../assets/images/celebrate.png"),
+  saving: require("../../assets/images/saving.png"),
+  waiting: require("../../assets/images/waiting.png"),
+  welcome: require("../../assets/images/welcome.png"),
+} as const;
+
+export function communityEmojiImage(id: keyof typeof nativeImages) {
+  return nativeImages[id];
+}

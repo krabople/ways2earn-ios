@@ -11,8 +11,9 @@ import {
 } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
-import { assetUrl, request, uploadImage } from "@/lib/api";
-import { communityEmojis } from "@/lib/community-emojis";
+import { request, uploadImage } from "@/lib/api";
+import { communityEmojiData } from "@/lib/community-emoji-data";
+import { communityEmojiImage, communityEmojis } from "@/lib/community-emojis";
 import { colours, radius, spacing } from "@/lib/theme";
 
 type MemberHit = { handle: string; name: string };
@@ -101,6 +102,24 @@ export function RichComposer({
 
   return (
     <View style={styles.wrap}>
+      {members.length ? (
+        <View style={styles.suggestions}>
+          {members.map((member) => (
+            <Pressable
+              key={member.handle}
+              onPress={() => {
+                command("mention", member.handle);
+                setMembers([]);
+                setQuery("");
+              }}
+              style={styles.suggestion}
+            >
+              <Text style={styles.handle}>@{member.handle}</Text>
+              <Text style={styles.memberName}>{member.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       <View style={styles.toolbar}>
         <Tool label="B" onPress={() => command("bold")} bold />
         <Tool label="I" onPress={() => command("italic")} italic />
@@ -124,14 +143,14 @@ export function RichComposer({
             onPress={() =>
               command("customEmoji", {
                 token: emoji.token,
-                src: assetUrl(emoji.src),
+                src: communityEmojiData[emoji.id],
                 label: emoji.label,
               })
             }
             style={styles.emojiButton}
           >
             <ExpoImage
-              source={assetUrl(emoji.src)}
+              source={communityEmojiImage(emoji.id)}
               contentFit="contain"
               style={styles.emojiImage}
             />
@@ -147,24 +166,6 @@ export function RichComposer({
         style={[styles.web, { height: minHeight }]}
         source={{ html: editorHtml(initial, placeholder) }}
       />
-      {members.length ? (
-        <View style={styles.suggestions}>
-          {members.map((member) => (
-            <Pressable
-              key={member.handle}
-              onPress={() => {
-                command("mention", member.handle);
-                setMembers([]);
-                setQuery("");
-              }}
-              style={styles.suggestion}
-            >
-              <Text style={styles.handle}>@{member.handle}</Text>
-              <Text style={styles.memberName}>{member.name}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
       <Text style={styles.hint}>
         Format text, add a link or image, or type @ to mention a member.
       </Text>
@@ -208,7 +209,7 @@ function editorHtml(markdown: string, placeholder: string) {
     .replace(/\n/g, "<br>");
   const emojiData = communityEmojis.map((emoji) => ({
     ...emoji,
-    src: assetUrl(emoji.src),
+    src: communityEmojiData[emoji.id],
   }));
   emojiData.forEach((emoji) => {
     escaped = escaped
@@ -284,8 +285,9 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   web: { width: "100%", backgroundColor: colours.surface },
   suggestions: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colours.line,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colours.line,
+    backgroundColor: colours.mintPale,
   },
   suggestion: {
     flexDirection: "row",

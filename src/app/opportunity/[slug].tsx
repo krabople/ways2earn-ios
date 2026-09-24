@@ -8,6 +8,7 @@ import { Alert, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { MessageState } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { CommunityBody } from "@/components/community-body";
+import { CommentsThread } from "@/components/comments-thread";
 import { API_ORIGIN, assetUrl } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import { age } from "@/lib/types";
@@ -178,18 +179,7 @@ export default function OpportunityScreen() {
           guarantee. Always check the current terms at the source.
         </Text>
       </View>
-      <Pressable
-        onPress={() =>
-          router.push({
-            pathname: "/comments/[kind]/[id]" as never,
-            params: { kind: "opportunity", id: item.id },
-          })
-        }
-        style={styles.comments}
-      >
-        <Text style={styles.sectionTitle}>{item.comments} comments</Text>
-        <Text style={styles.done}>Join the discussion ›</Text>
-      </Pressable>
+      <CommentsThread kind="opportunity" id={item.id} />
       <Pressable
         onPress={() =>
           void act({
@@ -343,16 +333,6 @@ const styles = StyleSheet.create({
   },
   metricValue: { color: colours.green, fontSize: 20, fontWeight: "900" },
   metricLabel: { color: colours.slate, fontSize: 10 },
-  comments: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colours.surface,
-    borderWidth: 1,
-    borderColor: colours.line,
-  },
   report: {
     color: colours.slate,
     fontSize: 12,

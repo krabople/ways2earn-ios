@@ -76,6 +76,8 @@ export function Screen({
       </View>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}
         refreshControl={
           onRefresh ? (
