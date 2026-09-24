@@ -1,8 +1,8 @@
-import { ArticleIntro, ArticleSection, Bullet, Paragraph } from '@/components/article';
+import { ArticleDoneButton, ArticleIntro, ArticleSection, Bullet, Paragraph } from '@/components/article';
 import { Screen } from '@/components/screen';
 
 export default function TrustScreen() {
-  return <Screen title="Trust centre">
+  return <Screen title="Trust centre" action={<ArticleDoneButton />}>
     <ArticleIntro kicker="CHECK BEFORE YOU ACT" title="Make better-informed choices.">Ways2Earn helps members compare real experiences. Moderation and community votes are useful context, not a guarantee that an offer is safe or suitable.</ArticleIntro>
     <ArticleSection title="A five-minute opportunity check" tone="green">
       <Bullet>Open the provider’s official website and check the full domain, terms, eligibility and closing date.</Bullet>

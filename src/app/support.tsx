@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ArticleIntro, ArticleSection, Bullet, Paragraph } from '@/components/article';
+import { ArticleDoneButton, ArticleIntro, ArticleSection, Bullet, Paragraph } from '@/components/article';
 import { Screen } from '@/components/screen';
 import { colours, radius, spacing } from '@/lib/theme';
 import { useApp } from '@/providers/app-provider';
@@ -27,7 +27,7 @@ export default function SupportScreen() {
     } finally { setBusy(false); }
   }
 
-  return <Screen title="Contact support">
+  return <Screen title="Contact support" action={<ArticleDoneButton />}>
     <ArticleIntro kicker="PRIVATE HELP" title="Tell us what happened.">Account issues, moderation questions and safety concerns can be sent privately to the Ways2Earn team.</ArticleIntro>
     {!signedIn ? <ArticleSection title="Sign in to contact the team" tone="green"><Paragraph>Support requests are linked to your account so you can receive and read the reply securely.</Paragraph><Pressable style={styles.primary} onPress={() => router.push('/login')}><Text style={styles.primaryText}>Sign in</Text></Pressable></ArticleSection> : <View style={styles.form}>
       <View style={styles.field}><Text style={styles.label}>Subject</Text><TextInput value={subject} onChangeText={setSubject} maxLength={180} placeholder="Briefly describe the problem" placeholderTextColor={colours.slate} style={styles.input} /></View>

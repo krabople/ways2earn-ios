@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colours, radius, spacing } from '@/lib/theme';
 
@@ -19,6 +20,10 @@ export function Bullet({ children, light = false }: { children: ReactNode; light
   return <View style={styles.bulletRow}><Text style={[styles.bullet, light && styles.light]}>•</Text><Text style={[styles.paragraph, styles.bulletText, light && styles.light]}>{children}</Text></View>;
 }
 
+export function ArticleDoneButton() {
+  return <Pressable accessibilityRole="button" accessibilityLabel="Return to account" onPress={() => router.back()}><Text style={styles.done}>Done</Text></Pressable>;
+}
+
 const styles = StyleSheet.create({
   intro: { gap: spacing.sm, paddingBottom: spacing.sm },
   kicker: { color: colours.green, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
@@ -35,4 +40,5 @@ const styles = StyleSheet.create({
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   bullet: { color: colours.green, width: 12, fontSize: 17, lineHeight: 22, fontWeight: '900' },
   bulletText: { flex: 1 },
+  done: { color: colours.green, fontSize: 14, fontWeight: '800' },
 });

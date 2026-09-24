@@ -1,8 +1,8 @@
-import { ArticleIntro, ArticleSection, Bullet, Paragraph } from '@/components/article';
+import { ArticleDoneButton, ArticleIntro, ArticleSection, Bullet, Paragraph } from '@/components/article';
 import { Screen } from '@/components/screen';
 
 export default function PrivacyScreen() {
-  return <Screen title="Privacy policy">
+  return <Screen title="Privacy policy" action={<ArticleDoneButton />}>
     <ArticleIntro kicker="YOUR INFORMATION" title="Privacy without surprises.">This is the in-app summary of how Ways2Earn uses information. It applies alongside the full policy shown on the website.</ArticleIntro>
     <ArticleSection title="Accounts and public activity">
       <Paragraph>Your profile, published posts, discussions and comments can be seen by other people. Saved opportunities, earnings records, support requests and notification choices are private to your account.</Paragraph>
