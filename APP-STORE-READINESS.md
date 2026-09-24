@@ -21,8 +21,8 @@ Ways2Earn is a community utility for discovering, checking and tracking earning 
 ## Before TestFlight/App Review
 
 - [ ] Enrol in the Apple Developer Program and create the App Store Connect record.
-- [ ] Create/link the EAS project and add `EXPO_TOKEN`, `EXPO_PROJECT_ID` and the App Store Connect numeric `ASC_APP_ID` as GitHub repository secrets.
-- [ ] Complete Apple signing once interactively so EAS can use managed credentials non-interactively.
+- [ ] Create an App Store Connect API key and add `ASC_KEY_ID`, `ASC_ISSUER_ID`, base64-encoded `ASC_API_KEY_BASE64` and `APPLE_TEAM_ID` as GitHub repository secrets.
+- [ ] Confirm the API key can create or manage signing assets for bundle ID `com.krabople.ways2earn`.
 - [ ] Add a dedicated App Review demo account with populated but non-sensitive data.
 - [ ] Disable the public holding gate or explicitly allow the review account through it.
 - [ ] Complete App Privacy answers for account details, user content, identifiers, diagnostics and any analytics actually present in the submitted build.

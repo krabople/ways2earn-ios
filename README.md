@@ -27,12 +27,12 @@ npx expo-doctor
 
 ## Signed iOS builds
 
-The GitHub Actions workflow uses EAS Build. It requires:
+The GitHub Actions workflow uses a macOS runner and Xcode directly. It does not require an Expo account. It requires:
 
-- an Expo/EAS project linked in `app.config.ts`;
-- repository secrets `EXPO_TOKEN`, `EXPO_PROJECT_ID` and the numeric `ASC_APP_ID`;
-- Apple distribution credentials configured for bundle ID `com.krabople.ways2earn`.
+- an App Store Connect API key stored as `ASC_KEY_ID`, `ASC_ISSUER_ID` and base64-encoded `ASC_API_KEY_BASE64` repository secrets;
+- the Apple Developer team identifier stored as `APPLE_TEAM_ID`;
+- an App Store Connect record and App ID for bundle ID `com.krabople.ways2earn`.
 
-After those one-time owner-authenticated steps, run **Build signed iOS IPA** from GitHub Actions. The workflow waits for the signed build, attaches `Ways2Earn.ipa` as a private workflow artifact and uploads the same build to TestFlight. It does not submit the app for public App Review.
+After those one-time owner-authenticated steps, run **Build and upload iOS to TestFlight** from GitHub Actions. It generates the native Xcode project, signs and attaches `Ways2Earn.ipa`, then uploads the same build to TestFlight. It does not submit the app for public App Review.
 
 See [APP-STORE-READINESS.md](APP-STORE-READINESS.md) before TestFlight or App Review.
