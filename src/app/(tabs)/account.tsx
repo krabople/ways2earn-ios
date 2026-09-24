@@ -30,6 +30,9 @@ export default function AccountScreen() {
           >
             <Text style={styles.primaryText}>Sign in</Text>
           </Pressable>
+          <Pressable onPress={() => router.push("/register")}>
+            <Text style={styles.guestLink}>Create an account</Text>
+          </Pressable>
         </View>
         <LegalLinks />
       </Screen>
@@ -206,6 +209,7 @@ const styles = StyleSheet.create({
     backgroundColor: colours.mint,
   },
   primaryText: { color: colours.navy, fontWeight: "900" },
+  guestLink: { color: "white", textAlign: "center", fontWeight: "800" },
   profile: {
     flexDirection: "row",
     alignItems: "center",

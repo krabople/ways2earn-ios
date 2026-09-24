@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Brand } from "@/components/screen";
+import { ApiError } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import { useApp } from "@/providers/app-provider";
 
@@ -21,15 +22,19 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
 
   async function submit() {
     setBusy(true);
     setError("");
+    setPendingEmail("");
     try {
       await signIn(login.trim(), password);
       router.back();
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : "Sign-in failed.");
+      if (problem instanceof ApiError && problem.code === "email_pending")
+        setPendingEmail(problem.email || (login.includes("@") ? login.trim() : ""));
     } finally {
       setBusy(false);
     }
@@ -82,6 +87,16 @@ export default function LoginScreen() {
               {error}
             </Text>
           ) : null}
+          {pendingEmail ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({ pathname: "/resend-confirmation", params: { email: pendingEmail } })
+              }
+            >
+              <Text style={styles.link}>Resend confirmation email</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             disabled={busy || !login || !password}
             onPress={() => void submit()}
@@ -98,6 +113,9 @@ export default function LoginScreen() {
             Your password is sent only to Ways2Earn over HTTPS and is never
             stored on this device.
           </Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push("/register")}>
+            <Text style={styles.link}>New here? Create an account</Text>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -162,4 +180,5 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textAlign: "center",
   },
+  link: { color: colours.green, fontSize: 14, fontWeight: "800", textAlign: "center" },
 });

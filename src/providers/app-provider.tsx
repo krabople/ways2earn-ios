@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -47,19 +48,26 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [feed, setFeed] = useState<Feed | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const sessionEpoch = useRef(0);
+  const signOutPending = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(async () => {
+    const epoch = sessionEpoch.current;
     try {
-      setFeed(await getFeed());
+      if (signOutPending.current) await signOutPending.current;
+      const next = await getFeed();
+      if (epoch !== sessionEpoch.current) return;
+      setFeed(next);
       setError("");
     } catch (problem) {
+      if (epoch !== sessionEpoch.current) return;
       setError(
         problem instanceof Error
           ? problem.message
           : "Unable to load Ways2Earn.",
       );
     } finally {
-      setLoading(false);
+      if (epoch === sessionEpoch.current) setLoading(false);
     }
   }, []);
 
@@ -85,15 +93,17 @@ export function AppProvider({ children }: PropsWithChildren) {
 
   const signIn = useCallback(
     async (login: string, password: string) => {
+      if (signOutPending.current) await signOutPending.current;
       await apiSignIn(login, password);
+      sessionEpoch.current += 1;
       await refresh();
     },
     [refresh],
   );
 
   const signOut = useCallback(async () => {
-    // Clear the visible session immediately; network revocation must never leave
-    // the interface looking signed in until the next launch.
+    // Invalidate in-flight feed requests before clearing the visible account.
+    sessionEpoch.current += 1;
     setFeed((current) =>
       current
         ? {
@@ -106,13 +116,17 @@ export function AppProvider({ children }: PropsWithChildren) {
         : null,
     );
     setError("");
-    const bearer = await token();
-    await saveToken(null);
-    void apiSignOut(bearer).catch(() => undefined);
+    setLoading(false);
+    const pending = (async () => {
+      const bearer = await token();
+      await saveToken(null);
+      void apiSignOut(bearer).catch(() => undefined);
+    })();
+    signOutPending.current = pending;
     try {
-      setFeed(await getFeed());
-    } catch {
-      /* The signed-out shell remains usable offline. */
+      await pending;
+    } finally {
+      if (signOutPending.current === pending) signOutPending.current = null;
     }
   }, []);
 

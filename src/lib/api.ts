@@ -6,6 +6,13 @@ export const API_ORIGIN =
   process.env.EXPO_PUBLIC_API_ORIGIN ?? "https://www.ways2earn.com";
 const TOKEN_KEY = "ways2earn.mobile.session";
 
+export class ApiError extends Error {
+  constructor(message: string, public code?: string, public email?: string) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function token() {
   return SecureStore.getItemAsync(TOKEN_KEY);
 }
@@ -38,10 +45,16 @@ export async function request<T>(
     },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const result = (await response.json()) as T & { error?: string };
+  const result = (await response.json()) as T & {
+    error?: string;
+    code?: string;
+    email?: string;
+  };
   if (!response.ok)
-    throw new Error(
+    throw new ApiError(
       result.error || "Ways2Earn could not complete that request.",
+      result.code,
+      result.email,
     );
   return result;
 }
@@ -58,20 +71,33 @@ export async function signIn(login: string, password: string) {
 
 export async function signOut(bearerOverride?: string | null) {
   const bearer = bearerOverride ?? (await token());
-  try {
-    if (bearer)
-      await fetch(`${API_ORIGIN}/api/mobile/session`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${bearer}`,
-        },
-        body: JSON.stringify({ action: "logout" }),
-      });
-  } finally {
-    await saveToken(null);
-  }
+  if (bearer)
+    await fetch(`${API_ORIGIN}/api/mobile/session`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${bearer}`,
+      },
+      body: JSON.stringify({ action: "logout" }),
+    });
+}
+
+export async function registerAccount(handle: string, email: string, password: string) {
+  return request<{ ok: true; message: string }>("/registration", {
+    action: "register",
+    handle,
+    email,
+    password,
+    confirm_password: password,
+  });
+}
+
+export async function resendConfirmation(email: string) {
+  return request<{ ok: true; message: string }>("/registration", {
+    action: "resend",
+    email,
+  });
 }
 
 export const getFeed = () => request<Feed>();
