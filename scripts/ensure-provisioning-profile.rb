@@ -6,9 +6,9 @@ require "openssl"
 require "time"
 require "uri"
 
-KEY_ID = ENV.fetch("APPSTORE_KEY_ID")
-ISSUER_ID = ENV.fetch("APPSTORE_ISSUER_ID")
-PRIVATE_KEY = ENV.fetch("APPSTORE_PRIVATE_KEY")
+KEY_ID = ENV.fetch("ASC_KEY_ID")
+ISSUER_ID = ENV.fetch("ASC_ISSUER_ID")
+PRIVATE_KEY = Base64.decode64(ENV.fetch("ASC_API_KEY_BASE64"))
 BUNDLE_ID = ENV.fetch("APP_BUNDLE_ID", "com.krabople.ways2earn")
 PROFILE_NAME = ENV.fetch("PROFILE_NAME", "Ways2Earn App Store")
 
