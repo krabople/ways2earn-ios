@@ -122,6 +122,8 @@ jobs:
 
       - name: Upload to TestFlight
         run: |
+          mkdir -p private_keys
+          install -m 600 "$RUNNER_TEMP/private_keys/AuthKey_${ASC_KEY_ID}.p8" "private_keys/AuthKey_${ASC_KEY_ID}.p8"
           xcrun altool --upload-app \
             --type ios \
             --file Ways2Earn.ipa \
