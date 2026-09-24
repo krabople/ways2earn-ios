@@ -4,14 +4,14 @@ export type Member = {
   displayName: string;
   bio: string;
   avatarUrl?: string | null;
-  role: 'member' | 'moderator' | 'admin';
+  role: "member" | "moderator" | "admin";
   status: string;
 };
 
 export type Opportunity = {
   id: string;
   slug: string;
-  type: 'Earn' | 'Freebie' | 'Deal';
+  type: "Earn" | "Freebie" | "Deal";
   category: string;
   title: string;
   summary: string;
@@ -46,6 +46,7 @@ export type Opportunity = {
   saved: boolean;
   outcome: string | null;
   progress: string | null;
+  editSnapshot?: Record<string, unknown> | null;
 };
 
 export type Topic = {
@@ -81,9 +82,12 @@ export type Feed = {
 };
 
 export function age(value: string) {
-  const iso = value.endsWith('Z') ? value : `${value.replace(' ', 'T')}Z`;
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
-  if (minutes < 1) return 'Now';
+  const iso = value.endsWith("Z") ? value : `${value.replace(" ", "T")}Z`;
+  const minutes = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(iso).getTime()) / 60000),
+  );
+  if (minutes < 1) return "Now";
   if (minutes < 60) return `${minutes}m`;
   if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
   return `${Math.floor(minutes / 1440)}d`;

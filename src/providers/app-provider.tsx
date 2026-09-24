@@ -1,9 +1,24 @@
-import { useRouter } from 'expo-router';
-import * as Notifications from 'expo-notifications';
-import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useRouter } from "expo-router";
+import * as Notifications from "expo-notifications";
+import {
+  createContext,
+  type PropsWithChildren,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-import { getFeed, mutate, signIn as apiSignIn, signOut as apiSignOut } from '@/lib/api';
-import type { Feed } from '@/lib/types';
+import {
+  getFeed,
+  mutate,
+  saveToken,
+  signIn as apiSignIn,
+  signOut as apiSignOut,
+  token,
+} from "@/lib/api";
+import type { Feed } from "@/lib/types";
 
 type AppContextValue = {
   feed: Feed | null;
@@ -31,14 +46,18 @@ export function AppProvider({ children }: PropsWithChildren) {
   const router = useRouter();
   const [feed, setFeed] = useState<Feed | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
     try {
       setFeed(await getFeed());
-      setError('');
+      setError("");
     } catch (problem) {
-      setError(problem instanceof Error ? problem.message : 'Unable to load Ways2Earn.');
+      setError(
+        problem instanceof Error
+          ? problem.message
+          : "Unable to load Ways2Earn.",
+      );
     } finally {
       setLoading(false);
     }
@@ -46,46 +65,76 @@ export function AppProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     void refresh();
-    const response = Notifications.addNotificationResponseReceivedListener((event) => {
-      const href = event.notification.request.content.data?.href;
-      if (typeof href === 'string') router.push(href as never);
-    });
+    const response = Notifications.addNotificationResponseReceivedListener(
+      (event) => {
+        const href = event.notification.request.content.data?.href;
+        if (typeof href === "string") router.push(href as never);
+      },
+    );
     return () => response.remove();
   }, [refresh, router]);
 
-  const action = useCallback(async <T,>(body: Record<string, unknown>) => {
-    const result = await mutate<T>(body);
-    await refresh();
-    return result;
-  }, [refresh]);
+  const action = useCallback(
+    async <T,>(body: Record<string, unknown>) => {
+      const result = await mutate<T>(body);
+      await refresh();
+      return result;
+    },
+    [refresh],
+  );
 
-  const signIn = useCallback(async (login: string, password: string) => {
-    await apiSignIn(login, password);
-    await refresh();
-  }, [refresh]);
+  const signIn = useCallback(
+    async (login: string, password: string) => {
+      await apiSignIn(login, password);
+      await refresh();
+    },
+    [refresh],
+  );
 
   const signOut = useCallback(async () => {
-    await apiSignOut();
-    setFeed(null);
-    await refresh();
-  }, [refresh]);
+    // Clear the visible session immediately; network revocation must never leave
+    // the interface looking signed in until the next launch.
+    setFeed((current) =>
+      current
+        ? {
+            ...current,
+            user: null,
+            unread: 0,
+            unreadMessages: 0,
+            pushEnabled: false,
+          }
+        : null,
+    );
+    setError("");
+    const bearer = await token();
+    await saveToken(null);
+    void apiSignOut(bearer).catch(() => undefined);
+    try {
+      setFeed(await getFeed());
+    } catch {
+      /* The signed-out shell remains usable offline. */
+    }
+  }, []);
 
-  const value = useMemo(() => ({
-    feed,
-    loading,
-    error,
-    signedIn: Boolean(feed?.user),
-    refresh,
-    action,
-    signIn,
-    signOut,
-  }), [action, error, feed, loading, refresh, signIn, signOut]);
+  const value = useMemo(
+    () => ({
+      feed,
+      loading,
+      error,
+      signedIn: Boolean(feed?.user),
+      refresh,
+      action,
+      signIn,
+      signOut,
+    }),
+    [action, error, feed, loading, refresh, signIn, signOut],
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
   const value = useContext(AppContext);
-  if (!value) throw new Error('useApp must be used inside AppProvider.');
+  if (!value) throw new Error("useApp must be used inside AppProvider.");
   return value;
 }
