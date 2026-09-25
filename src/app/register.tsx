@@ -1,13 +1,18 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Brand } from "@/components/screen";
-import { registerAccount } from "@/lib/api";
+import { registerAccount, socialProviders, type SocialProvider } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
+import { useApp } from "@/providers/app-provider";
 
 export default function RegisterScreen() {
+  const { signInWithProvider } = useApp();
+  const [providers, setProviders] = useState<SocialProvider[]>([]);
+  useEffect(() => { void socialProviders().then(setProviders).catch(() => setProviders([])); }, []);
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,6 +20,13 @@ export default function RegisterScreen() {
   const [error, setError] = useState("");
   const [complete, setComplete] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  async function social(provider: SocialProvider) {
+    setBusy(true); setError("");
+    try { if (await signInWithProvider(provider)) router.back(); }
+    catch (problem) { setError(problem instanceof Error ? problem.message : "Registration could not be completed."); }
+    finally { setBusy(false); }
+  }
 
   async function submit() {
     if (!/^[a-z][a-z0-9_-]{2,24}$/i.test(handle.trim())) {
@@ -92,6 +104,12 @@ export default function RegisterScreen() {
                 <Pressable disabled={busy || !handle.trim() || !email.trim() || !password || !confirm} style={[styles.primary, (busy || !handle.trim() || !email.trim() || !password || !confirm) && styles.disabled]} onPress={() => void submit()}>
                   <Text style={styles.primaryText}>{busy ? "Creating account…" : "Create account"}</Text>
                 </Pressable>
+                {providers.length ? <View style={styles.socialChoices}>
+                  <Text style={styles.help}>Or join with an account you already have</Text>
+                  {providers.map(provider => provider === "apple" ?
+                    <AppleAuthentication.AppleAuthenticationButton key="apple" buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={8} style={styles.appleButton} onPress={() => { if (!busy) void social("apple"); }} /> :
+                    <Pressable key={provider} accessibilityRole="button" disabled={busy} style={styles.socialButton} onPress={() => void social(provider)}><Text style={styles.socialText}>Continue with Facebook</Text></Pressable>)}
+                </View> : null}
                 <Text style={styles.help}>By joining, you can read our privacy information and community rules in the Account tab.</Text>
                 <Pressable onPress={() => router.replace("/login")}><Text style={styles.link}>Already a member? Sign in</Text></Pressable>
               </>
@@ -120,4 +138,8 @@ const styles = StyleSheet.create({
   primaryText: { color: "white", fontWeight: "800" },
   disabled: { opacity: 0.45 },
   link: { color: colours.green, fontSize: 14, fontWeight: "800", textAlign: "center" },
+  socialChoices: { gap: 9, alignItems: "stretch" },
+  socialButton: { minHeight: 48, borderWidth: 1, borderColor: colours.line, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
+  appleButton: { width: "100%", height: 48 },
+  socialText: { color: colours.ink, fontWeight: "800" },
 });

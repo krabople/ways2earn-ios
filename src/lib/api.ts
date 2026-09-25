@@ -1,4 +1,8 @@
 import * as SecureStore from "expo-secure-store";
+import * as Crypto from "expo-crypto";
+import * as WebBrowser from "expo-web-browser";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { Platform } from "react-native";
 
 import type { Feed, Member } from "./types";
 
@@ -64,6 +68,63 @@ export async function signIn(login: string, password: string) {
     action: "login",
     login,
     password,
+  });
+  await saveToken(result.token);
+  return result.user;
+}
+
+export type SocialProvider = "apple" | "facebook";
+
+export async function socialProviders(): Promise<SocialProvider[]> {
+  const result = await request<{ providers: SocialProvider[] }>("/auth/providers");
+  return result.providers;
+}
+
+async function nativeAppleSignIn(link: boolean) {
+    const { nonce } = await request<{ nonce: string }>(`/auth/apple/challenge${link ? "?link=1" : ""}`);
+    let credential: AppleAuthentication.AppleAuthenticationCredential;
+    try {
+      credential = await AppleAuthentication.signInAsync({
+        nonce,
+        requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
+      });
+    } catch (problem) {
+      if (problem && typeof problem === "object" && "code" in problem && problem.code === "ERR_REQUEST_CANCELED") return null;
+      throw problem;
+    }
+    if (!credential.identityToken) throw new ApiError("Apple did not return an identity token.");
+    const name = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(" ");
+    const result = await request<{ token: string; user: Member }>("/session", {
+      action: "appleNative", nonce, identityToken: credential.identityToken, name,
+    });
+    await saveToken(result.token);
+    return result.user;
+}
+
+export async function linkAppleAccount() {
+  if (Platform.OS !== "ios") throw new ApiError("Apple sign-in is available on iOS only.");
+  return nativeAppleSignIn(true);
+}
+
+export async function signInWithProvider(provider: SocialProvider) {
+  if (provider === "apple" && Platform.OS === "ios") {
+    return nativeAppleSignIn(false);
+  }
+  const bytes = await Crypto.getRandomBytesAsync(32);
+  const verifier = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier, { encoding: Crypto.CryptoEncoding.BASE64 });
+  const challenge = digest.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const callback = "ways2earn://auth";
+  const url = `${API_ORIGIN}/auth/${provider}/start?intent=mobile&challenge=${encodeURIComponent(challenge)}`;
+  const response = await WebBrowser.openAuthSessionAsync(url, callback);
+  if (response.type !== "success") return null;
+  const returned = new URL(response.url);
+  if (returned.protocol !== "ways2earn:" || returned.host !== "auth")
+    throw new ApiError("The sign-in response did not come back to Ways2Earn.");
+  const ticket = returned.searchParams.get("ticket");
+  if (!ticket) throw new ApiError("The sign-in request was not completed.");
+  const result = await request<{ token: string; user: Member }>("/session", {
+    action: "socialExchange", ticket, verifier,
   });
   await saveToken(result.token);
   return result.user;

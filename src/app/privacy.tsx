@@ -28,6 +28,13 @@ export default function PrivacyScreen() {
           conversation is reported, the reporter can choose to attach a recent
           transcript for the moderation team.
         </Paragraph>
+        <Paragraph>
+          If you choose Apple or Facebook sign-in, that provider shares an
+          account identifier and, where available, your name and email address
+          with Ways2Earn. We use these to create or connect your account. We do
+          not post to your Apple or Facebook account, and email sign-in remains
+          available.
+        </Paragraph>
       </ArticleSection>
       <ArticleSection title="What the app stores" tone="green">
         <Bullet>

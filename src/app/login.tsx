@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import * as AppleAuthentication from "expo-apple-authentication";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,17 +13,27 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Brand } from "@/components/screen";
-import { ApiError } from "@/lib/api";
+import { ApiError, socialProviders, type SocialProvider } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import { useApp } from "@/providers/app-provider";
 
 export default function LoginScreen() {
-  const { signIn } = useApp();
+  const { signIn, signInWithProvider } = useApp();
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
+  const [providers, setProviders] = useState<SocialProvider[]>([]);
+
+  useEffect(() => { void socialProviders().then(setProviders).catch(() => setProviders([])); }, []);
+
+  async function social(provider: SocialProvider) {
+    setBusy(true); setError("");
+    try { if (await signInWithProvider(provider)) router.back(); }
+    catch (problem) { setError(problem instanceof Error ? problem.message : "Sign-in failed."); }
+    finally { setBusy(false); }
+  }
 
   async function submit() {
     setBusy(true);
@@ -54,6 +65,12 @@ export default function LoginScreen() {
           >
             <Text style={styles.close}>×</Text>
           </Pressable>
+          {providers.length ? <View style={styles.socialChoices}>
+            <Text style={styles.help}>Or sign in another way</Text>
+            {providers.map(provider => provider === "apple" ?
+              <AppleAuthentication.AppleAuthenticationButton key="apple" buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={8} style={styles.appleButton} onPress={() => { if (!busy) void social("apple"); }} /> :
+              <Pressable key={provider} accessibilityRole="button" disabled={busy} style={styles.socialButton} onPress={() => void social(provider)}><Text style={styles.socialText}>Continue with Facebook</Text></Pressable>)}
+          </View> : null}
         </View>
         <View style={styles.card}>
           <Text style={styles.kicker}>WELCOME BACK</Text>
@@ -181,4 +198,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   link: { color: colours.green, fontSize: 14, fontWeight: "800", textAlign: "center" },
+  socialChoices: { gap: 9, alignItems: "stretch" },
+  socialButton: { minHeight: 48, borderWidth: 1, borderColor: colours.line, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
+  appleButton: { width: "100%", height: 48 },
+  socialText: { color: colours.ink, fontWeight: "800" },
 });

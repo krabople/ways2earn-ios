@@ -5,12 +5,22 @@ import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
+import { linkAppleAccount, request, socialProviders } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import { useApp } from "@/providers/app-provider";
 
 export default function AccountScreen() {
-  const { feed, signedIn, signOut, action } = useApp();
+  const { feed, signedIn, signOut, action, refresh } = useApp();
   const [notifications, setNotifications] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  const [appleLinked, setAppleLinked] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
+  useEffect(() => {
+    if (!signedIn) return;
+    void Promise.all([socialProviders(), request<{ linkedProviders: string[] }>("?view=my")])
+      .then(([providers, account]) => { setAppleAvailable(providers.includes("apple")); setAppleLinked(account.linkedProviders?.includes("apple") ?? false); })
+      .catch(() => undefined);
+  }, [signedIn]);
   useEffect(
     () => setNotifications(Boolean(feed?.pushEnabled)),
     [feed?.pushEnabled],
@@ -141,6 +151,13 @@ export default function AccountScreen() {
           onPress={() => router.push("/notification-settings" as never)}
         />
       </View>
+      {appleAvailable ? <View style={styles.group}>
+        <Row title="Apple sign-in" subtitle={appleLinked ? "Connected to this account" : "Use your Apple Account to sign in next time"} onPress={() => {
+          if (appleLinked || linkBusy) return;
+          setLinkBusy(true);
+          void linkAppleAccount().then(async user => { if (user) { setAppleLinked(true); await refresh(); } }).catch(problem => Alert.alert("Could not connect Apple", problem instanceof Error ? problem.message : "Please try again.")).finally(() => setLinkBusy(false));
+        }} />
+      </View> : null}
       <LegalLinks />
       <Pressable
         style={styles.signOut}

@@ -16,6 +16,8 @@ import {
   mutate,
   saveToken,
   signIn as apiSignIn,
+  signInWithProvider as apiSignInWithProvider,
+  type SocialProvider,
   signOut as apiSignOut,
   token,
 } from "@/lib/api";
@@ -29,6 +31,7 @@ type AppContextValue = {
   refresh: () => Promise<void>;
   action: <T = { ok: true }>(body: Record<string, unknown>) => Promise<T>;
   signIn: (login: string, password: string) => Promise<void>;
+  signInWithProvider: (provider: SocialProvider) => Promise<boolean>;
   signOut: () => Promise<void>;
 };
 
@@ -101,6 +104,15 @@ export function AppProvider({ children }: PropsWithChildren) {
     [refresh],
   );
 
+  const signInWithProvider = useCallback(async (provider: SocialProvider) => {
+    if (signOutPending.current) await signOutPending.current;
+    const user = await apiSignInWithProvider(provider);
+    if (!user) return false;
+    sessionEpoch.current += 1;
+    await refresh();
+    return true;
+  }, [refresh]);
+
   const signOut = useCallback(async () => {
     // Invalidate in-flight feed requests before clearing the visible account.
     sessionEpoch.current += 1;
@@ -139,9 +151,10 @@ export function AppProvider({ children }: PropsWithChildren) {
       refresh,
       action,
       signIn,
+      signInWithProvider,
       signOut,
     }),
-    [action, error, feed, loading, refresh, signIn, signOut],
+    [action, error, feed, loading, refresh, signIn, signInWithProvider, signOut],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

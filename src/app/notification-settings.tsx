@@ -228,8 +228,11 @@ export default function NotificationSettingsScreen() {
             />
           </View>
           <Text style={styles.scopeHelp}>
-            Leave the keyword and category blank to be notified about every new
-            post of the selected type.
+            {category
+              ? `Leave the keyword blank to be notified about every new ${category} post.`
+              : type === 'All'
+                ? 'Choose a post type to browse its categories, or enter a keyword to follow across all types.'
+                : 'Leave the keyword and category blank to follow every new post of this type.'}
           </Text>
           <Pressable
             disabled={saving}

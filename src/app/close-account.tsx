@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import { Screen } from "@/components/screen";
+import { request } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import { useApp } from "@/providers/app-provider";
 
@@ -17,6 +18,9 @@ export default function CloseAccountScreen() {
   const { feed, action, signOut } = useApp();
   const [confirmation, setConfirmation] = useState("");
   const [password, setPassword] = useState("");
+  const [socialConfirmation, setSocialConfirmation] = useState("");
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  useEffect(() => { void request<{ hasPassword: boolean }>("?view=my").then(data => setHasPassword(data.hasPassword)).catch(() => setHasPassword(null)); }, []);
   const phrase = `DELETE @${feed?.user?.handle ?? ""}`;
   function close() {
     Alert.alert(
@@ -28,7 +32,7 @@ export default function CloseAccountScreen() {
           text: "Permanently close",
           style: "destructive",
           onPress: async () => {
-            await action({ action: "deleteAccount", confirmation, password });
+            await action({ action: "deleteAccount", confirmation, password, socialConfirmation });
             await signOut();
             router.replace("/");
           },
@@ -56,19 +60,19 @@ export default function CloseAccountScreen() {
           onChangeText={setConfirmation}
           style={styles.input}
         />
-        <Text style={styles.label}>Current password</Text>
-        <TextInput
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          style={styles.input}
-        />
+        {hasPassword === false ? <>
+          <Text style={styles.label}>Then type CLOSE MY ACCOUNT</Text>
+          <TextInput autoCapitalize="characters" value={socialConfirmation} onChangeText={setSocialConfirmation} style={styles.input} />
+        </> : <>
+          <Text style={styles.label}>Current password</Text>
+          <TextInput secureTextEntry value={password} onChangeText={setPassword} style={styles.input} />
+        </>}
         <Pressable
-          disabled={confirmation !== phrase || !password}
+          disabled={confirmation !== phrase || hasPassword === null || (hasPassword ? !password : socialConfirmation !== "CLOSE MY ACCOUNT")}
           onPress={close}
           style={[
             styles.danger,
-            (confirmation !== phrase || !password) && styles.disabled,
+            (confirmation !== phrase || hasPassword === null || (hasPassword ? !password : socialConfirmation !== "CLOSE MY ACCOUNT")) && styles.disabled,
           ]}
         >
           <Text style={styles.dangerText}>Permanently close account</Text>
