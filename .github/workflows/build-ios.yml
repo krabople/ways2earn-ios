@@ -69,7 +69,7 @@ jobs:
           ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
-          PROFILE_NAME: Ways2Earn App Store
+          PROFILE_NAME: Ways2Earn App Store Apple Sign In 20260925
         run: ruby scripts/ensure-provisioning-profile.rb
 
       - name: Archive signed app
