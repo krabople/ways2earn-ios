@@ -53,9 +53,10 @@ certificate_serial = normalise_serial(p12.certificate.serial.to_i.to_s(16))
 
 bundle = request(
   :get,
-  "/v1/bundleIds?filter[identifier]=#{URI.encode_www_form_component(BUNDLE_ID)}"
-).fetch("data").first
+  "/v1/bundleIds?filter[identifier]=#{URI.encode_www_form_component(BUNDLE_ID)}&filter[platform]=IOS"
+).fetch("data").find { |item| item.fetch("attributes")["identifier"] == BUNDLE_ID && item.fetch("attributes")["platform"] == "IOS" }
 abort "Bundle ID #{BUNDLE_ID} is not registered." unless bundle
+puts "Using iOS Bundle ID resource #{bundle.fetch('id')}."
 
 certificates = request(:get, "/v1/certificates?limit=200").fetch("data")
 certificate = certificates.find do |item|

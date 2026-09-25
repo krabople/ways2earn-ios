@@ -26,8 +26,8 @@ async function call(method, path, body) {
 }
 const get = path => call('GET', path);
 
-const bundles = await get('/v1/bundleIds?filter%5Bidentifier%5D=com.krabople.ways2earn');
-const bundle = bundles.data?.[0];
+const bundles = await get('/v1/bundleIds?filter%5Bidentifier%5D=com.krabople.ways2earn&filter%5Bplatform%5D=IOS');
+const bundle = bundles.data?.find(item => item.attributes?.identifier === 'com.krabople.ways2earn' && item.attributes?.platform === 'IOS');
 if (!bundle) throw new Error('Ways2Earn App ID was not found.');
 const capabilities = await get(`/v1/bundleIds/${bundle.id}/bundleIdCapabilities`);
 let types = capabilities.data?.map(item => item.attributes?.capabilityType) ?? [];
