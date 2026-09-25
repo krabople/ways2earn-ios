@@ -51,12 +51,15 @@ p12 = OpenSSL::PKCS12.new(
 )
 certificate_serial = normalise_serial(p12.certificate.serial.to_i.to_s(16))
 
-bundle = request(
+bundles = request(
   :get,
-  "/v1/bundleIds?filter[identifier]=#{URI.encode_www_form_component(BUNDLE_ID)}&filter[platform]=IOS"
-).fetch("data").find { |item| item.fetch("attributes")["identifier"] == BUNDLE_ID && item.fetch("attributes")["platform"] == "IOS" }
-abort "Bundle ID #{BUNDLE_ID} is not registered." unless bundle
-puts "Using iOS Bundle ID resource #{bundle.fetch('id')}."
+  "/v1/bundleIds?filter[identifier]=#{URI.encode_www_form_component(BUNDLE_ID)}"
+).fetch("data").select { |item| item.fetch("attributes")["identifier"] == BUNDLE_ID }
+puts "Matching bundle resources: #{bundles.map { |item| "#{item.fetch('id')}:#{item.fetch('attributes')['platform']}" }.join(', ')}"
+bundle = bundles.find { |item| item.fetch("attributes")["platform"] == "IOS" } ||
+         bundles.find { |item| item.fetch("attributes")["platform"] == "UNIVERSAL" }
+abort "Bundle ID #{BUNDLE_ID} has no iOS-capable registration." unless bundle
+puts "Using Bundle ID resource #{bundle.fetch('id')}."
 
 certificates = request(:get, "/v1/certificates?limit=200").fetch("data")
 certificate = certificates.find do |item|
@@ -70,6 +73,7 @@ profiles = request(
   :get,
   "/v1/profiles?filter[name]=#{URI.encode_www_form_component(PROFILE_NAME)}&limit=200"
 ).fetch("data")
+puts "Matching profiles: #{profiles.map { |item| "#{item.fetch('attributes')['name']}:#{item.fetch('attributes')['profileState']}:#{item.fetch('attributes')['profileType']}" }.join(', ')}"
 profile = profiles.find do |item|
   attributes = item.fetch("attributes")
   attributes["profileState"] == "ACTIVE" &&
