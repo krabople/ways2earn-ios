@@ -117,7 +117,7 @@ export default function DiscoverScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.feedContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => <OpportunityCard item={item} onHidden={() => { setItems((previous) => previous.filter((entry) => entry.id !== item.id)); if (showHidden) void loadHidden(); }} />}
+        renderItem={({ item }) => <OpportunityCard item={item} onVoteChange={(updated) => setItems((previous) => previous.map((entry) => entry.id === updated.id ? updated : entry))} onHidden={() => { setItems((previous) => previous.filter((entry) => entry.id !== item.id)); if (showHidden) void loadHidden(); }} />}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.4}
         refreshing={loading || pageLoading}
@@ -218,7 +218,7 @@ export default function DiscoverScreen() {
                 <Text style={styles.unhide}>Unhide</Text>
               </Pressable>
             </View>
-          )) : !hiddenLoading ? <Text style={styles.expiredHint}>No hidden posts yet.</Text> : null : null}
+          )) : !hiddenLoading ? <Text style={styles.expiredHint}>No hidden posts yet. Swipe left on a post to hide it.</Text> : null : null}
           {showHidden && hiddenNextOffset !== null ? <Pressable onPress={() => void loadHidden(hiddenNextOffset)}><Text style={styles.unhide}>Load more hidden posts</Text></Pressable> : null}
           {hideError ? <Text style={styles.expiredHint}>{hideError}</Text> : null}
         </View>

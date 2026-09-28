@@ -34,7 +34,7 @@ export default function SavedScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: 110 }}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-        renderItem={({ item }) => <OpportunityCard item={item} onHidden={() => void load()} />}
+        renderItem={({ item }) => <OpportunityCard item={item} onVoteChange={(updated) => setSaved((previous) => previous.map((entry) => entry.id === updated.id ? updated : entry))} onHidden={() => void load()} />}
         onEndReached={() => { if (nextOffset !== null && !loading && !moreLoading) void load(nextOffset); }}
         onEndReachedThreshold={0.4}
         refreshing={loading}

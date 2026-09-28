@@ -2,19 +2,25 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 
-import { assetUrl } from "@/lib/api";
+import { assetUrl, getOpportunity } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import type { Opportunity } from "@/lib/types";
 import { age } from "@/lib/types";
 import { useApp } from "@/providers/app-provider";
 
-export function OpportunityCard({ item, onHidden }: { item: Opportunity; onHidden?: () => void }) {
-  const { action, signedIn } = useApp();
+export function OpportunityCard({ item, onHidden, onVoteChange }: {
+  item: Opportunity;
+  onHidden?: () => void;
+  onVoteChange: (updated: Opportunity) => void;
+}) {
+  const { action, feed, signedIn } = useApp();
   const expired = item.status === "expired";
   const hiding = useRef(false);
+  const voting = useRef(false);
+  const [voteBusy, setVoteBusy] = useState(false);
   const [hideError, setHideError] = useState("");
   const hide = () => {
     if (!signedIn || hiding.current) return;
@@ -27,13 +33,32 @@ export function OpportunityCard({ item, onHidden }: { item: Opportunity; onHidde
   };
 
   async function vote(value: -1 | 1) {
-    if (!signedIn) return;
-    await Haptics.selectionAsync();
-    await action({
-      action: "vote",
-      id: item.id,
-      value: item.vote === value ? 0 : value,
+    if (!signedIn || voting.current) return;
+    voting.current = true;
+    setVoteBusy(true);
+    const nextVote = item.vote === value ? 0 : value;
+    onVoteChange({
+      ...item,
+      vote: nextVote,
+      temperature: item.temperature + (nextVote - item.vote) * (feed?.votePower ?? 1),
     });
+    void Haptics.selectionAsync().catch(() => {});
+    try {
+      await action({ action: "vote", id: item.id, value: nextVote });
+      // The server remains authoritative if the member's vote weight changed.
+      try {
+        const { item: updated } = await getOpportunity(item.id);
+        onVoteChange(updated);
+      } catch {
+        // Keep the optimistic result if only the follow-up read failed.
+      }
+    } catch (problem) {
+      onVoteChange(item);
+      Alert.alert("Vote not saved", problem instanceof Error ? problem.message : "Please try again.");
+    } finally {
+      voting.current = false;
+      setVoteBusy(false);
+    }
   }
 
   return (
@@ -41,7 +66,7 @@ export function OpportunityCard({ item, onHidden }: { item: Opportunity; onHidde
       <View style={styles.vote}>
         <Pressable
           accessibilityLabel="Vote hotter"
-          disabled={!signedIn}
+          disabled={!signedIn || voteBusy}
           onPress={() => void vote(1)}
           style={[styles.voteButton, item.vote === 1 && styles.voteSelected]}
         >
@@ -53,7 +78,7 @@ export function OpportunityCard({ item, onHidden }: { item: Opportunity; onHidde
         </Text>
         <Pressable
           accessibilityLabel="Vote colder"
-          disabled={!signedIn}
+          disabled={!signedIn || voteBusy}
           onPress={() => void vote(-1)}
           style={[styles.voteButton, item.vote === -1 && styles.voteSelected]}
         >
