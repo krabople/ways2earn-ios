@@ -17,11 +17,14 @@ import { useApp } from "@/providers/app-provider";
 const types = ["Earn", "Freebie", "Deal"] as const;
 
 export default function DiscoverScreen() {
-  const { feed, loading, error, refresh } = useApp();
+  const { feed, loading, error, refresh, action, signedIn } = useApp();
   const [type, setType] = useState<(typeof types)[number]>("Earn");
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [showExpired, setShowExpired] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
+  const [hideError, setHideError] = useState("");
+  const hidden = (feed?.opportunities ?? []).filter((item) => item.hidden);
   const categories = useMemo(
     () => [
       "All",
@@ -38,6 +41,7 @@ export default function DiscoverScreen() {
       (feed?.opportunities ?? []).filter(
         (item) =>
           item.type === type &&
+          !item.hidden &&
           (showExpired || item.status !== "expired") &&
           (category === "All" || item.category === category) &&
           (!query.trim() ||
@@ -132,7 +136,24 @@ export default function DiscoverScreen() {
           </Text>
         </View>
       </Pressable>
+      {signedIn ? <Text style={styles.swipeHint}>Swipe a post left to hide it from your feed.</Text> : null}
       {error ? <MessageState title="Unable to refresh" body={error} /> : null}
+      {signedIn ? (
+        <View style={styles.hiddenSection}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHidden }} onPress={() => setShowHidden(!showHidden)}>
+            <Text style={styles.hiddenHeading}>Hidden posts ({hidden.length}) {showHidden ? "▴" : "▾"}</Text>
+          </Pressable>
+          {showHidden ? hidden.length ? hidden.map((item) => (
+            <View key={item.id} style={styles.hiddenRow}>
+              <Text numberOfLines={2} style={styles.hiddenTitle}>{item.title}</Text>
+              <Pressable accessibilityLabel={`Unhide ${item.title}`} onPress={() => void action({ action: "hidePost", id: item.id, hidden: false }).catch((problem) => setHideError(problem instanceof Error ? problem.message : "Could not unhide post."))}>
+                <Text style={styles.unhide}>Unhide</Text>
+              </Pressable>
+            </View>
+          )) : <Text style={styles.expiredHint}>No hidden posts yet. Swipe a feed card left to hide it.</Text> : null}
+          {hideError ? <Text style={styles.expiredHint}>{hideError}</Text> : null}
+        </View>
+      ) : null}
       <View style={styles.list}>
         {items.map((item) => (
           <OpportunityCard key={item.id} item={item} />
@@ -149,6 +170,12 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
+  hiddenSection: { gap: 10, paddingVertical: 14 },
+  swipeHint: { color: colours.slate, fontSize: 11 },
+  hiddenHeading: { color: colours.ink, fontWeight: "700", fontSize: 14 },
+  hiddenRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: colours.surface, borderRadius: radius.md },
+  hiddenTitle: { flex: 1, color: colours.ink, fontSize: 13 },
+  unhide: { color: colours.green, fontWeight: "800", fontSize: 13 },
   intro: { gap: 5 },
   eyebrow: {
     color: colours.green,

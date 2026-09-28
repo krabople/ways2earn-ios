@@ -1,7 +1,9 @@
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
+import { useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 
 import { assetUrl } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
@@ -12,6 +14,17 @@ import { useApp } from "@/providers/app-provider";
 export function OpportunityCard({ item }: { item: Opportunity }) {
   const { action, signedIn } = useApp();
   const expired = item.status === "expired";
+  const hiding = useRef(false);
+  const [hideError, setHideError] = useState("");
+  const hide = () => {
+    if (!signedIn || hiding.current) return;
+    hiding.current = true;
+    setHideError("");
+    void action({ action: "hidePost", id: item.id, hidden: true }).catch((problem) => {
+      hiding.current = false;
+      setHideError(problem instanceof Error ? problem.message : "Could not hide this post.");
+    });
+  };
 
   async function vote(value: -1 | 1) {
     if (!signedIn) return;
@@ -24,7 +37,7 @@ export function OpportunityCard({ item }: { item: Opportunity }) {
   }
 
   return (
-    <View style={[styles.card, expired && styles.expired]}>
+    <View><Swipeable enabled={signedIn} overshootRight={false} rightThreshold={72} renderRightActions={() => <Pressable accessibilityLabel={`Hide ${item.title}`} onPress={hide} style={styles.hideAction}><Text style={styles.hideText}>Hide</Text></Pressable>} onSwipeableOpen={hide} containerStyle={styles.swipeContainer}><View style={[styles.card, expired && styles.expired]}>
       <View style={styles.vote}>
         <Pressable
           accessibilityLabel="Vote hotter"
@@ -85,11 +98,15 @@ export function OpportunityCard({ item }: { item: Opportunity }) {
           </View>
         </Pressable>
       </Link>
-    </View>
+    </View></Swipeable>{hideError ? <Text style={styles.hideError}>{hideError}</Text> : null}</View>
   );
 }
 
 const styles = StyleSheet.create({
+  swipeContainer: { borderRadius: radius.lg },
+  hideAction: { width: 80, justifyContent: "center", alignItems: "center", backgroundColor: colours.navy, borderRadius: radius.md },
+  hideText: { color: colours.surface, fontWeight: "800" },
+  hideError: { color: colours.coral, fontSize: 12 },
   card: {
     flexDirection: "row",
     alignItems: "stretch",

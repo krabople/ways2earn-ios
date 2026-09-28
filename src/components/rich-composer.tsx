@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { Image as ExpoImage } from "expo-image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -35,6 +35,11 @@ export function RichComposer({
   const [members, setMembers] = useState<MemberHit[]>([]);
   const [uploading, setUploading] = useState(false);
   const [initial] = useState(value);
+  const [contentHeight, setContentHeight] = useState(minHeight);
+  const source = useMemo(
+    () => ({ html: editorHtml(initial, placeholder) }),
+    [initial, placeholder],
+  );
 
   useEffect(() => {
     if (!query) {
@@ -89,9 +94,14 @@ export function RichComposer({
   function receive(event: WebViewMessageEvent) {
     try {
       const message = JSON.parse(event.nativeEvent.data) as {
-        markdown: string;
+        height?: number;
+        markdown?: string;
         mention?: string;
       };
+      if (typeof message.height === "number" && Number.isFinite(message.height)) {
+        setContentHeight(Math.max(minHeight, Math.ceil(message.height)));
+      }
+      if (typeof message.markdown !== "string") return;
       lastEmitted.current = message.markdown;
       onChange(message.markdown);
       setQuery(message.mention ?? "");
@@ -163,8 +173,8 @@ export function RichComposer({
         scrollEnabled={false}
         keyboardDisplayRequiresUserAction={false}
         onMessage={receive}
-        style={[styles.web, { height: minHeight }]}
-        source={{ html: editorHtml(initial, placeholder) }}
+        style={[styles.web, { height: Math.max(minHeight, contentHeight) }]}
+        source={source}
       />
       <Text style={styles.hint}>
         Format text, add a link or image, or type @ to mention a member.
@@ -220,12 +230,18 @@ function editorHtml(markdown: string, placeholder: string) {
   });
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>*{box-sizing:border-box}html,body{margin:0;background:#fff;color:#102a46;font:16px -apple-system,BlinkMacSystemFont,sans-serif}#editor{min-height:118px;padding:13px;outline:0;line-height:1.5}#editor:empty:before{content:attr(data-placeholder);color:#728397}img{max-width:100%;height:auto;border-radius:8px}.w2e-emoji{display:inline-block;width:34px;height:34px;object-fit:contain;vertical-align:middle;margin:0 2px;border-radius:0}a{color:#00845f}</style></head><body><div id="editor" contenteditable="true" data-placeholder="${placeholder.replace(/"/g, "&quot;")}">${escaped}</div><script>
   const editor=document.getElementById('editor');
+  let heightFrame=0,lastHeight=0;
+  function measure(){cancelAnimationFrame(heightFrame);heightFrame=requestAnimationFrame(()=>{const height=Math.ceil(editor.getBoundingClientRect().height)+2;if(height!==lastHeight){lastHeight=height;window.ReactNativeWebView.postMessage(JSON.stringify({height}))}})}
+  new ResizeObserver(measure).observe(editor);
+  editor.addEventListener('load',measure,true);
+  window.addEventListener('resize',measure);
+  measure();
   const emojis=${JSON.stringify(emojiData)};
   function render(value){let html=(value||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\n/g,'<br>');emojis.forEach(e=>{html=html.split(e.token).join('<img class="w2e-emoji" data-token="'+e.token+'" src="'+e.src+'" alt="'+e.label+'">')});return html}
   function md(node){if(node.nodeType===3)return node.nodeValue||'';if(node.nodeType!==1)return '';const tag=node.tagName.toLowerCase(),inner=[...node.childNodes].map(md).join('');if(tag==='strong'||tag==='b')return '**'+inner+'**';if(tag==='em'||tag==='i')return '_'+inner+'_';if(tag==='a')return '['+inner+']('+node.getAttribute('href')+')';if(tag==='img'&&node.dataset.token)return node.dataset.token;if(tag==='img')return '!['+(node.getAttribute('alt')||'Image')+']('+node.getAttribute('src')+')';if(tag==='br')return '\\n';if(['div','p'].includes(tag))return inner+'\\n';return inner}
   function emit(){const text=editor.innerText||'';const match=text.match(/(?:^|\\s)@([a-z0-9-]{1,30})$/i);window.ReactNativeWebView.postMessage(JSON.stringify({markdown:[...editor.childNodes].map(md).join('').replace(/\\n{3,}/g,'\\n\\n').trim(),mention:match?match[1]:''}))}
   editor.addEventListener('input',emit);editor.addEventListener('keyup',emit);editor.addEventListener('blur',emit);
-  window.w2eSet=(value)=>{editor.innerHTML=render(value)};
+  window.w2eSet=(value)=>{editor.innerHTML=render(value);measure()};
   window.w2eCommand=(name,arg)=>{editor.focus();if(name==='link'){const url=prompt('Paste an https:// link');if(url&&/^https?:\\/\\//i.test(url))document.execCommand('createLink',false,url)}else if(name==='image'){document.execCommand('insertHTML',false,'<img src="'+arg.replace(/"/g,'&quot;')+'" alt="Uploaded image"><br>')}else if(name==='customEmoji'){document.execCommand('insertHTML',false,'<img class="w2e-emoji" data-token="'+arg.token+'" src="'+arg.src+'" alt="'+arg.label+'">&nbsp;')}else if(name==='text'){document.execCommand('insertText',false,arg)}else if(name==='mention'){const sel=window.getSelection();if(sel&&sel.rangeCount){const range=sel.getRangeAt(0);const before=range.startContainer.nodeType===3?range.startContainer.nodeValue.slice(0,range.startOffset):'';const m=before.match(/@([a-z0-9-]*)$/i);if(m){range.setStart(range.startContainer,range.startOffset-m[0].length);range.deleteContents()}}document.execCommand('insertText',false,'@'+arg+' ')}else document.execCommand(name,false,null);emit()};
   </script></body></html>`;
 }

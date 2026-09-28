@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -57,22 +58,20 @@ export default function LoginScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.page}
       >
-        <View style={styles.header}>
-          <Brand />
-          <Pressable
-            accessibilityLabel="Close sign in"
-            onPress={() => router.back()}
-          >
-            <Text style={styles.close}>×</Text>
-          </Pressable>
-          {providers.length ? <View style={styles.socialChoices}>
-            <Text style={styles.help}>Or sign in another way</Text>
-            {providers.map(provider => provider === "apple" ?
-              <AppleAuthentication.AppleAuthenticationButton key="apple" buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK} cornerRadius={8} style={styles.appleButton} onPress={() => { if (!busy) void social("apple"); }} /> :
-              <Pressable key={provider} accessibilityRole="button" disabled={busy} style={styles.socialButton} onPress={() => void social(provider)}><Text style={styles.socialText}>Continue with Facebook</Text></Pressable>)}
-          </View> : null}
-        </View>
-        <View style={styles.card}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.header}>
+            <Brand />
+            <Pressable
+              accessibilityLabel="Close sign in"
+              accessibilityRole="button"
+              hitSlop={10}
+              onPress={() => router.back()}
+              style={styles.closeButton}
+            >
+              <Text style={styles.close}>×</Text>
+            </Pressable>
+          </View>
+          <View style={styles.card}>
           <Text style={styles.kicker}>WELCOME BACK</Text>
           <Text style={styles.title}>Sign in to Ways2Earn</Text>
           <Text style={styles.help}>
@@ -126,6 +125,33 @@ export default function LoginScreen() {
               {busy ? "Signing in…" : "Sign in securely"}
             </Text>
           </Pressable>
+          {providers.length ? (
+            <View style={styles.socialChoices}>
+              <Text style={styles.help}>Or sign in with an account you already have</Text>
+              {providers.map((provider) =>
+                provider === "apple" ? (
+                  <AppleAuthentication.AppleAuthenticationButton
+                    key="apple"
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                    cornerRadius={8}
+                    style={styles.appleButton}
+                    onPress={() => { if (!busy) void social("apple"); }}
+                  />
+                ) : (
+                  <Pressable
+                    key={provider}
+                    accessibilityRole="button"
+                    disabled={busy}
+                    style={[styles.socialButton, busy && styles.disabled]}
+                    onPress={() => void social(provider)}
+                  >
+                    <Text style={styles.socialText}>Continue with Facebook</Text>
+                  </Pressable>
+                ),
+              )}
+            </View>
+          ) : null}
           <Text style={styles.security}>
             Your password is sent only to Ways2Earn over HTTPS and is never
             stored on this device.
@@ -133,7 +159,8 @@ export default function LoginScreen() {
           <Pressable accessibilityRole="button" onPress={() => router.push("/register")}>
             <Text style={styles.link}>New here? Create an account</Text>
           </Pressable>
-        </View>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -141,15 +168,22 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colours.canvas },
-  page: { flex: 1, padding: spacing.lg },
+  page: { flex: 1 },
+  content: { padding: spacing.lg, paddingBottom: spacing.xl },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+  closeButton: {
+    minWidth: 40,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   close: { color: colours.slate, fontSize: 34, fontWeight: "300" },
   card: {
-    marginTop: 50,
+    marginTop: spacing.xl,
     padding: spacing.xl,
     borderRadius: radius.lg,
     borderWidth: 1,

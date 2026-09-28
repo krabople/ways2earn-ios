@@ -1,8 +1,9 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
+import { StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
 import { CommunityBody } from "@/components/community-body";
+import { CommentsThread } from "@/components/comments-thread";
 import { MessageState } from "@/components/states";
 import { colours, radius, spacing } from "@/lib/theme";
 import { age } from "@/lib/types";
@@ -31,17 +32,7 @@ export default function DiscussionScreen() {
         </Text>
         <CommunityBody body={topic.body} style={styles.body} />
       </View>
-      <Pressable
-        style={styles.primary}
-        onPress={() =>
-          router.push({
-            pathname: "/comments/[kind]/[id]" as never,
-            params: { kind: "discussion", id: topic.id },
-          })
-        }
-      >
-        <Text style={styles.primaryText}>View {topic.replies} replies</Text>
-      </Pressable>
+      <CommentsThread kind="discussion" id={topic.id} />
     </Screen>
   );
 }
@@ -63,12 +54,4 @@ const styles = StyleSheet.create({
   },
   meta: { color: colours.slate, fontSize: 12 },
   body: { color: colours.ink, fontSize: 15, lineHeight: 24 },
-  primary: {
-    minHeight: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.md,
-    backgroundColor: colours.green,
-  },
-  primaryText: { color: "white", fontWeight: "800" },
 });

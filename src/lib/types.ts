@@ -44,6 +44,7 @@ export type Opportunity = {
   bookmarks: number;
   vote: number;
   saved: boolean;
+  hidden: boolean;
   outcome: string | null;
   progress: string | null;
   editSnapshot?: Record<string, unknown> | null;
