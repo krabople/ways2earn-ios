@@ -19,8 +19,7 @@ import type { Opportunity } from "@/lib/types";
 import { useApp } from "@/providers/app-provider";
 
 const types = ["Earn", "Freebie", "Deal"] as const;
-const typeColours = { Earn: colours.navy, Freebie: "#087753", Deal: "#9B433C" };
-const typeBackgrounds = { Earn: "#E8EEF4", Freebie: "#E8F8F2", Deal: "#F9ECEA" };
+const inactiveTabColour = "#E8EEF4";
 
 export default function DiscoverScreen() {
   const { loading, error, refresh, action, signedIn } = useApp();
@@ -150,13 +149,13 @@ export default function DiscoverScreen() {
             }}
             style={[
               styles.segmentButton,
-              { backgroundColor: type === item ? typeColours[item] : typeBackgrounds[item] },
+              { backgroundColor: type === item ? colours.navy : inactiveTabColour },
             ]}
           >
             <Text
               style={[
                 styles.segmentText,
-                { color: type === item ? colours.surface : typeColours[item] },
+                { color: type === item ? colours.surface : colours.navy },
               ]}
             >
               {item === "Earn"
