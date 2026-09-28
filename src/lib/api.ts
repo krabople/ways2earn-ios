@@ -2,6 +2,8 @@ import * as SecureStore from "expo-secure-store";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as AppleAuthentication from "expo-apple-authentication";
+import { File } from "expo-file-system";
+import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
 
 import type { Feed, Member, Opportunity } from "./types";
@@ -182,12 +184,8 @@ export const mutate = <T = { ok: true }>(body: Record<string, unknown>) =>
 export async function uploadImage(uri: string) {
   const bearer = await token();
   const data = new FormData();
-  data.append("image", {
-    uri,
-    name: "ways2earn-image.jpg",
-    type: "image/jpeg",
-  } as unknown as Blob);
-  const response = await fetch(`${API_ORIGIN}/api/mobile/images`, {
+  data.append("image", new File(uri));
+  const response = await expoFetch(`${API_ORIGIN}/api/mobile/images`, {
     method: "POST",
     headers: {
       Accept: "application/json",

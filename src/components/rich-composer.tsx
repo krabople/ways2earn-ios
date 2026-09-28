@@ -23,11 +23,13 @@ export function RichComposer({
   onChange,
   placeholder = "Write something useful…",
   minHeight = 130,
+  enableMentions = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   minHeight?: number;
+  enableMentions?: boolean;
 }) {
   const web = useRef<WebView>(null);
   const lastEmitted = useRef(value);
@@ -42,7 +44,7 @@ export function RichComposer({
   );
 
   useEffect(() => {
-    if (!query) {
+    if (!enableMentions || !query) {
       setMembers([]);
       return;
     }
@@ -56,7 +58,7 @@ export function RichComposer({
       180,
     );
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, enableMentions]);
 
   useEffect(() => {
     if (value === lastEmitted.current) return;
@@ -104,7 +106,7 @@ export function RichComposer({
       if (typeof message.markdown !== "string") return;
       lastEmitted.current = message.markdown;
       onChange(message.markdown);
-      setQuery(message.mention ?? "");
+      setQuery(enableMentions ? message.mention ?? "" : "");
     } catch {
       /* Ignore unrelated web messages. */
     }
@@ -173,11 +175,11 @@ export function RichComposer({
         scrollEnabled={false}
         keyboardDisplayRequiresUserAction={false}
         onMessage={receive}
-        style={[styles.web, { height: Math.max(minHeight, contentHeight) }]}
+        style={[styles.web, { height: Math.max(minHeight, contentHeight), minHeight, flex: 0 }]}
         source={source}
       />
       <Text style={styles.hint}>
-        Format text, add a link or image, or type @ to mention a member.
+        {enableMentions ? "Format text, add a link or image, or type @ to mention a member." : "Format text, add a link or image."}
       </Text>
     </View>
   );
@@ -248,6 +250,7 @@ function editorHtml(markdown: string, placeholder: string) {
 
 const styles = StyleSheet.create({
   wrap: {
+    flexShrink: 0,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: "#C4D0D7",
@@ -299,7 +302,7 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "900" },
   italic: { fontStyle: "italic" },
   disabled: { opacity: 0.45 },
-  web: { width: "100%", backgroundColor: colours.surface },
+  web: { width: "100%", minHeight: 130, flex: 0, backgroundColor: colours.surface },
   suggestions: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colours.line,
