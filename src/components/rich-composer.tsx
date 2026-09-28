@@ -146,6 +146,7 @@ export function RichComposer({
         horizontal
         keyboardShouldPersistTaps="handled"
         showsHorizontalScrollIndicator={false}
+        style={styles.emojiScroll}
         contentContainerStyle={styles.emojiTray}
       >
         {selectableCommunityEmojis.map((emoji) => (
@@ -175,7 +176,8 @@ export function RichComposer({
         scrollEnabled={false}
         keyboardDisplayRequiresUserAction={false}
         onMessage={receive}
-        style={[styles.web, { height: Math.max(minHeight, contentHeight), minHeight, flex: 0 }]}
+        containerStyle={[styles.editorFrame, { height: Math.max(minHeight, contentHeight), minHeight }]}
+        style={styles.web}
         source={source}
       />
       <Text style={styles.hint}>
@@ -276,6 +278,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colours.line,
     backgroundColor: "#F7FAF9",
   },
+  emojiScroll: { height: 54, flexGrow: 0, flexShrink: 0 },
   emojiButton: {
     width: 40,
     height: 40,
@@ -302,7 +305,8 @@ const styles = StyleSheet.create({
   bold: { fontWeight: "900" },
   italic: { fontStyle: "italic" },
   disabled: { opacity: 0.45 },
-  web: { width: "100%", minHeight: 130, flex: 0, backgroundColor: colours.surface },
+  editorFrame: { width: "100%", flex: 0, flexGrow: 0, flexShrink: 0, backgroundColor: colours.surface },
+  web: { flex: 1, width: "100%", backgroundColor: colours.surface },
   suggestions: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colours.line,

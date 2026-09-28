@@ -193,7 +193,7 @@ export default function MessagesScreen() {
           value={body}
           onChange={setBody}
           placeholder="Write a private message…"
-          minHeight={110}
+          minHeight={130}
           enableMentions={false}
         />
         <Pressable
