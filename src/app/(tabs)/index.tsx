@@ -13,17 +13,26 @@ import {
 import { OpportunityCard } from "@/components/opportunity-card";
 import { Screen } from "@/components/screen";
 import { MessageState } from "@/components/states";
-import { getOpportunities } from "@/lib/api";
+import { getOpportunities, type OpportunityPage } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import type { Opportunity } from "@/lib/types";
 import { useApp } from "@/providers/app-provider";
 
 const types = ["Earn", "Freebie", "Deal"] as const;
+type OpportunityType = (typeof types)[number];
+type CachedPage = { page: OpportunityPage; loadedAt: number };
+type FirstPageCache = {
+  viewer: string;
+  pages: Partial<Record<OpportunityType, CachedPage>>;
+  requests: Partial<Record<OpportunityType, Promise<OpportunityPage>>>;
+};
+const CACHE_FRESH_MS = 60_000;
 const inactiveTabColour = "#E8EEF4";
 
 export default function DiscoverScreen() {
-  const { loading, error, refresh, action, signedIn } = useApp();
-  const [type, setType] = useState<(typeof types)[number]>("Earn");
+  const { feed, loading, error, refresh, action, signedIn } = useApp();
+  const viewer = feed?.user?.id ?? "guest";
+  const [type, setType] = useState<OpportunityType>("Earn");
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [showExpired, setShowExpired] = useState(false);
@@ -41,35 +50,106 @@ export default function DiscoverScreen() {
   const [search, setSearch] = useState("");
   const generation = useRef(0);
   const loadingMore = useRef(false);
+  const firstPageRefreshing = useRef(false);
+  const listRef = useRef<FlatList<Opportunity>>(null);
+  const firstPages = useRef<FirstPageCache>({ viewer, pages: {}, requests: {} });
+
+  const currentCache = useCallback(() => {
+    if (firstPages.current.viewer !== viewer) {
+      firstPages.current = { viewer, pages: {}, requests: {} };
+    }
+    return firstPages.current;
+  }, [viewer]);
+
+  const defaultPage = useCallback((tab: OpportunityType, force = false): Promise<OpportunityPage> => {
+    const cache = currentCache();
+    if (!force && cache.pages[tab]) return Promise.resolve(cache.pages[tab].page);
+    if (!force && cache.requests[tab]) return cache.requests[tab];
+    const request = getOpportunities({ type: tab }).then((page) => {
+      if (firstPages.current === cache && cache.requests[tab] === request) {
+        cache.pages[tab] = { page, loadedAt: Date.now() };
+      }
+      return page;
+    }).finally(() => {
+      if (firstPages.current === cache && cache.requests[tab] === request) {
+        delete cache.requests[tab];
+      }
+    });
+    cache.requests[tab] = request;
+    return request;
+  }, [currentCache]);
+
+  const updateCachedVote = useCallback((updated: Opportunity) => {
+    const cache = currentCache();
+    for (const tab of types) {
+      const entry = cache.pages[tab];
+      if (entry) {
+        cache.pages[tab] = {
+          ...entry,
+          page: {
+            ...entry.page,
+            items: entry.page.items.map((item) => item.id === updated.id ? updated : item),
+          },
+        };
+      }
+    }
+    setItems((previous) => previous.map((item) => item.id === updated.id ? updated : item));
+  }, [currentCache]);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearch(query.trim()), 300);
     return () => clearTimeout(timer);
   }, [query]);
 
-  const loadFirst = useCallback(async () => {
+  const loadFirst = useCallback(async (force = false, keepVisible = false) => {
     const current = ++generation.current;
-    setPageLoading(true);
     setPageError("");
-    setItems([]);
-    setNextOffset(null);
+    const isDefault = category === "All" && !search && !showExpired;
+    const cached = isDefault ? currentCache().pages[type] : undefined;
+    if (cached) {
+      setItems(cached.page.items);
+      setNextOffset(cached.page.nextOffset);
+      setCategories(["All", ...cached.page.categories]);
+    } else if (!keepVisible) {
+      setItems([]);
+      setNextOffset(null);
+      setCategories(["All"]);
+    }
+    setPageLoading((!cached && !keepVisible) || force);
+    if (cached && !force && Date.now() - cached.loadedAt < CACHE_FRESH_MS) {
+      firstPageRefreshing.current = false;
+      return;
+    }
+    firstPageRefreshing.current = true;
     try {
-      const page = await getOpportunities({ type, category, query: search, showExpired });
+      const page = isDefault
+        ? await defaultPage(type, force || !!cached)
+        : await getOpportunities({ type, category, query: search, showExpired });
       if (current !== generation.current) return;
       setItems(page.items);
       setNextOffset(page.nextOffset);
       setCategories(["All", ...page.categories]);
     } catch (problem) {
-      if (current === generation.current) setPageError(problem instanceof Error ? problem.message : "Could not load posts.");
+      if (current === generation.current && !cached && !keepVisible) {
+        setPageError(problem instanceof Error ? problem.message : "Could not load posts.");
+      }
     } finally {
-      if (current === generation.current) setPageLoading(false);
+      if (current === generation.current) {
+        firstPageRefreshing.current = false;
+        setPageLoading(false);
+      }
     }
-  }, [type, category, search, showExpired]);
+  }, [type, category, search, showExpired, currentCache, defaultPage]);
 
-  useEffect(() => { void loadFirst(); return () => { generation.current += 1; }; }, [loadFirst, signedIn]);
+  useEffect(() => { void loadFirst(); return () => { generation.current += 1; }; }, [loadFirst]);
+
+  useEffect(() => {
+    // Only the first 20 of each tab are prefetched; subsequent pages remain on-demand.
+    for (const tab of types) void defaultPage(tab).catch(() => {});
+  }, [defaultPage]);
 
   const loadMore = useCallback(async () => {
-    if (nextOffset === null || pageLoading || loadingMore.current || pageError) return;
+    if (nextOffset === null || pageLoading || firstPageRefreshing.current || loadingMore.current || pageError) return;
     loadingMore.current = true;
     setMoreLoading(true);
     const current = generation.current;
@@ -102,22 +182,32 @@ export default function DiscoverScreen() {
     try {
       await action({ action: "hidePost", id: item.id, hidden: false });
       setHidden((previous) => previous.filter((entry) => entry.id !== item.id));
-      void loadFirst();
+      void loadFirst(true, true);
     } catch (problem) { setHideError(problem instanceof Error ? problem.message : "Could not unhide post."); }
   }
 
   async function onRefresh() {
-    await Promise.all([refresh(), loadFirst(), ...(showHidden ? [loadHidden()] : [])]);
+    await Promise.all([refresh(), loadFirst(true, true), ...(showHidden ? [loadHidden()] : [])]);
   }
 
   return (
     <Screen scroll={false}>
       <FlatList
+        ref={listRef}
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.feedContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => <OpportunityCard item={item} onVoteChange={(updated) => setItems((previous) => previous.map((entry) => entry.id === updated.id ? updated : entry))} onHidden={() => { setItems((previous) => previous.filter((entry) => entry.id !== item.id)); if (showHidden) void loadHidden(); }} />}
+        renderItem={({ item }) => <OpportunityCard item={item} onVoteChange={updateCachedVote} onHidden={() => {
+          const cache = currentCache();
+          for (const tab of types) {
+            const entry = cache.pages[tab];
+            if (entry) cache.pages[tab] = { ...entry, page: { ...entry.page, items: entry.page.items.filter((post) => post.id !== item.id) } };
+          }
+          setItems((previous) => previous.filter((entry) => entry.id !== item.id));
+          void loadFirst(true, true);
+          if (showHidden) void loadHidden();
+        }} />}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.4}
         refreshing={loading || pageLoading}
@@ -144,6 +234,16 @@ export default function DiscoverScreen() {
           <Pressable
             key={item}
             onPress={() => {
+              listRef.current?.scrollToOffset({ offset: 0, animated: false });
+              const cached = !search && !query.trim() && !showExpired ? currentCache().pages[item] : undefined;
+              if (cached) {
+                setItems(cached.page.items);
+                setNextOffset(cached.page.nextOffset);
+                setCategories(["All", ...cached.page.categories]);
+              } else {
+                setItems([]);
+                setNextOffset(null);
+              }
               setType(item);
               setCategory("All");
             }}
