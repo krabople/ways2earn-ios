@@ -109,9 +109,7 @@ export default function OpportunityScreen() {
         />
         <Text style={styles.category}>{item.category}</Text>
         <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.meta}>
-          Shared by @{item.authorHandle} · {age(item.createdAt)}
-        </Text>
+        <Text style={styles.meta}>Shared by <Text onPress={() => router.push({ pathname: "/member/[handle]", params: { handle: item.authorHandle } })} style={{ color: colours.green, fontWeight: "800" }}>@{item.authorHandle}</Text> · {age(item.createdAt)}</Text>
         <View style={styles.temperature}>
           <Pressable
             disabled={busy}

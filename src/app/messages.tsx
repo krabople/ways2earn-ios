@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { RichComposer } from "@/components/rich-composer";
-import { CommunityBody, plainCommunityText } from "@/components/community-body";
+import { plainCommunityText } from "@/components/community-body";
+import { RichMessageBody } from "@/components/rich-message-body";
 import { Screen } from "@/components/screen";
 import { MessageState } from "@/components/states";
 import { request } from "@/lib/api";
@@ -17,45 +19,66 @@ type Conversation = {
   last_body: string;
   last_message_at: string;
   unread: number;
+  participant_handles: string;
+  blocked_by_me: number;
+  messaging_blocked: number;
+  administrative: number;
 };
 type ChatMessage = {
   id: string;
   sender_id: string;
   sender: string;
+  handle: string;
   body: string;
   created_at: string;
 };
-type MessageData = { conversations: Conversation[]; messages: ChatMessage[] };
+type MessageData = { conversations: Conversation[]; messages: ChatMessage[]; activeId: string | null };
 
 export default function MessagesScreen() {
-  const { feed, action } = useApp();
+  const params = useLocalSearchParams<{ id?: string; handle?: string }>();
+  const { feed, signedIn, action } = useApp();
   const [data, setData] = useState<MessageData | null>(null);
-  const [active, setActive] = useState<string | null>(null);
+  const [active, setActive] = useState<string | null>(params.id ?? null);
+  const [recipient, setRecipient] = useState<string | null>(params.handle ?? null);
+  const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [reporting, setReporting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [includeTranscript, setIncludeTranscript] = useState(false);
+  const scroll = useRef<ScrollView>(null);
   const load = useCallback(
-    async (id?: string | null) =>
-      setData(
-        await request<MessageData>(
+    async (id?: string | null) => {
+      try { setData(await request<MessageData>(
           `?view=messages${id ? `&id=${encodeURIComponent(id)}` : ""}`,
-        ),
-      ),
+      )); setError(""); }
+      catch (problem) { setError(problem instanceof Error ? problem.message : "Could not load messages."); }
+    },
     [],
   );
   useEffect(() => {
-    void load(active);
-  }, [active, load]);
+    if (signedIn) void load(active);
+  }, [active, signedIn, load]);
+  useEffect(() => { if (params.id) { setActive(params.id); setRecipient(null); } else if (params.handle) { setRecipient(params.handle); setActive(null); } }, [params.id, params.handle]);
+  useEffect(() => { if (signedIn && active) void action({ action: "readConversation", id: active }).catch(() => undefined); }, [active, signedIn, action]);
+  useEffect(() => { if (active && data?.messages.length) scroll.current?.scrollToEnd({ animated: false }); }, [active, data]);
   async function open(id: string) {
+    setRecipient(null);
     setActive(id);
     await action({ action: "readConversation", id });
+    await load(id);
   }
   async function send() {
-    if (!active || body.trim().length < 2) return;
+    if ((!active && (!recipient || subject.trim().length < 3)) || body.trim().length < 2) return;
     setBusy(true);
     try {
-      await action({ action: "sendMessage", conversationId: active, body });
+      const sent = await action<{ id: string }>({ action: "sendMessage", ...(active ? { conversationId: active } : { recipient, subject: subject.trim() }), body });
       setBody("");
-      await load(active);
+      setRecipient(null);
+      setActive(sent.id);
+      await load(sent.id);
     } catch (problem) {
       Alert.alert(
         "Could not send",
@@ -66,9 +89,27 @@ export default function MessagesScreen() {
     }
   }
 
-  if (!active)
+  const current = data?.conversations.find(item => item.id === active);
+  const otherHandle = current?.participant_handles?.split(",")[0];
+  async function toggleBlock() {
+    if (!otherHandle || !current) return;
+    try { await action({ action: "blockMember", handle: otherHandle, blocked: !Number(current.blocked_by_me) }); await load(active); }
+    catch (problem) { Alert.alert("Could not update block", problem instanceof Error ? problem.message : "Please try again."); }
+  }
+  async function report() {
+    if (!active || !reason) return;
+    setBusy(true);
+    try { await action({ action: "reportConversation", conversationId: active, reason, details: details.trim(), includeTranscript }); setReporting(false); setReason(""); setDetails(""); setIncludeTranscript(false); Alert.alert("Report sent", "A moderator will review it."); }
+    catch (problem) { Alert.alert("Could not report", problem instanceof Error ? problem.message : "Please try again."); }
+    finally { setBusy(false); }
+  }
+
+  if (!signedIn) return <Screen title="Messages" back><MessageState title="Sign in to see messages" body="Your private conversations are available after sign-in." /><Pressable onPress={() => router.push("/login")} style={styles.primary}><Text style={styles.primaryText}>Sign in</Text></Pressable></Screen>;
+
+  if (!active && !recipient)
     return (
       <Screen title="Messages" back>
+        {error ? <Pressable onPress={() => void load()}><Text style={styles.error}>{error} Tap to retry.</Text></Pressable> : null}
         <View style={styles.list}>
           {data?.conversations.map((item) => (
             <Pressable
@@ -96,7 +137,7 @@ export default function MessagesScreen() {
             </Pressable>
           ))}
         </View>
-        {!data?.conversations.length ? (
+        {!data?.conversations.length && !error ? (
           <MessageState
             title="No messages yet"
             body="Visit a member’s profile to start a conversation. Moderators can also contact you about a submission."
@@ -107,16 +148,24 @@ export default function MessagesScreen() {
 
   return (
     <Screen
-      title="Conversation"
+      title={recipient ? `Message @${recipient}` : current?.subject || "Conversation"}
       back
+      scroll={false}
       action={
-        <Pressable onPress={() => setActive(null)}>
+        <Pressable onPress={() => { setActive(null); setRecipient(null); setReporting(false); }}>
           <Text style={styles.back}>Inbox</Text>
         </Pressable>
       }
     >
-      <View style={styles.thread}>
-        {data?.messages.map((message) => (
+      <KeyboardAvoidingView style={styles.chat} behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={58}>
+      {current ? <View style={styles.chatHeader}>
+        <Pressable onPress={() => otherHandle && router.push({ pathname: "/member/[handle]", params: { handle: otherHandle } })}><Text style={styles.back}>@{otherHandle}</Text></Pressable>
+        <View style={styles.headerActions}><Pressable onPress={() => setReporting(!reporting)}><Text style={styles.back}>Report</Text></Pressable><Pressable onPress={() => Alert.alert(Number(current.blocked_by_me) ? "Unblock member?" : "Block member?", "This changes who can message you.", [{ text: "Cancel", style: "cancel" }, { text: Number(current.blocked_by_me) ? "Unblock" : "Block", style: "destructive", onPress: () => void toggleBlock() }])}><Text style={styles.back}>{Number(current.blocked_by_me) ? "Unblock" : "Block"}</Text></Pressable></View>
+      </View> : null}
+      {reporting ? <ScrollView style={styles.report} keyboardShouldPersistTaps="handled"><Text style={styles.title}>Report this conversation</Text>{["Harassment or abuse", "Spam or scam", "Threats or unsafe behaviour", "Personal information", "Other"].map(value => <Pressable key={value} onPress={() => setReason(value)} style={styles.reason}><Text style={styles.preview}>{reason === value ? "◉" : "○"}  {value}</Text></Pressable>)}<TextInput multiline maxLength={1500} value={details} onChangeText={setDetails} placeholder="Details (optional)" style={styles.input} /><Pressable onPress={() => setIncludeTranscript(!includeTranscript)} style={styles.reason}><Text style={styles.preview}>{includeTranscript ? "☑" : "□"}  Include the last 200 messages in my report</Text></Pressable><Pressable disabled={!reason || busy} onPress={() => void report()} style={styles.primary}><Text style={styles.primaryText}>Send report</Text></Pressable></ScrollView> : <>
+      {recipient ? <TextInput value={subject} onChangeText={setSubject} maxLength={120} placeholder="Subject" style={styles.input} /> : null}
+      <ScrollView ref={scroll} style={styles.messages} contentContainerStyle={styles.thread} keyboardShouldPersistTaps="handled" onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}>
+        {(active && data?.activeId === active ? data.messages : []).map((message) => (
           <View
             key={message.id}
             style={[
@@ -125,15 +174,17 @@ export default function MessagesScreen() {
             ]}
           >
             <View style={styles.messageMeta}>
-              <Text style={styles.messageSender}>
+              <Text onPress={() => router.push({ pathname: "/member/[handle]", params: { handle: message.handle } })} style={styles.messageSender}>
                 {message.sender_id === feed?.user?.id ? "You" : message.sender}
               </Text>
               <Text style={styles.time}>{age(message.created_at)}</Text>
             </View>
-            <CommunityBody body={message.body} style={styles.messageBody} />
+            <RichMessageBody body={message.body} />
           </View>
         ))}
-      </View>
+        {error ? <Pressable onPress={() => void load(active)}><Text style={styles.error}>{error} Tap to retry.</Text></Pressable> : null}
+      </ScrollView>
+      {Number(current?.messaging_blocked) > 0 && !Number(current?.administrative) ? <Text style={styles.error}>Messaging is unavailable between these accounts.</Text> :
       <View style={styles.composer}>
         <RichComposer
           value={body}
@@ -142,7 +193,7 @@ export default function MessagesScreen() {
           minHeight={110}
         />
         <Pressable
-          disabled={busy || body.trim().length < 2}
+          disabled={busy || body.trim().length < 2 || Boolean(recipient && subject.trim().length < 3)}
           onPress={() => void send()}
           style={[
             styles.primary,
@@ -151,7 +202,9 @@ export default function MessagesScreen() {
         >
           <Text style={styles.primaryText}>{busy ? "Sending…" : "Send"}</Text>
         </Pressable>
-      </View>
+      </View>}
+      </>}
+      </KeyboardAvoidingView>
     </Screen>
   );
 }
@@ -193,7 +246,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   back: { color: colours.green, fontWeight: "800" },
-  thread: { gap: spacing.md },
+  chat: { flex: 1 },
+  chatHeader: { flexDirection: "row", justifyContent: "space-between", padding: spacing.md, backgroundColor: colours.surface, borderBottomWidth: 1, borderColor: colours.line },
+  headerActions: { flexDirection: "row", gap: spacing.lg },
+  messages: { flex: 1 },
+  thread: { gap: spacing.md, padding: spacing.md, flexGrow: 1, justifyContent: "flex-end" },
   message: {
     maxWidth: "86%",
     alignSelf: "flex-start",
@@ -233,4 +290,8 @@ const styles = StyleSheet.create({
   },
   primaryText: { color: "white", fontWeight: "800" },
   disabled: { opacity: 0.45 },
+  error: { color: colours.coral, padding: spacing.md },
+  input: { backgroundColor: colours.surface, borderColor: colours.line, borderWidth: 1, borderRadius: radius.md, padding: spacing.md, margin: spacing.sm },
+  report: { padding: spacing.lg },
+  reason: { paddingVertical: spacing.sm },
 });

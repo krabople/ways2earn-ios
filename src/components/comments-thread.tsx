@@ -186,9 +186,9 @@ export function CommentsThread({
             ) : (
               <>
                 <View style={styles.meta}>
-                  <Text style={styles.author}>{comment.author}</Text>
+                  <Text onPress={() => router.push({ pathname: "/member/[handle]", params: { handle: comment.handle } })} style={styles.author}>{comment.author}</Text>
                   <Text style={styles.time}>
-                    @{comment.handle} · {age(comment.createdAt)}
+                    <Text onPress={() => router.push({ pathname: "/member/[handle]", params: { handle: comment.handle } })}>@{comment.handle}</Text> · {age(comment.createdAt)}
                   </Text>
                 </View>
                 <CommunityBody body={comment.body} style={styles.body} />

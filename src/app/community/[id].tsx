@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/screen";
@@ -27,9 +27,7 @@ export default function DiscussionScreen() {
       <View style={styles.card}>
         <Text style={styles.category}>{topic.category}</Text>
         <Text style={styles.title}>{topic.title}</Text>
-        <Text style={styles.meta}>
-          By @{topic.handle} · {age(topic.createdAt)}
-        </Text>
+        <Text style={styles.meta}>By <Text onPress={() => router.push({ pathname: "/member/[handle]", params: { handle: topic.handle } })} style={{ color: colours.green, fontWeight: "800" }}>@{topic.handle}</Text> · {age(topic.createdAt)}</Text>
         <CommunityBody body={topic.body} style={styles.body} />
       </View>
       <CommentsThread kind="discussion" id={topic.id} />
