@@ -13,7 +13,7 @@ import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import { request, uploadImage } from "@/lib/api";
 import { communityEmojiData } from "@/lib/community-emoji-data";
-import { communityEmojiImage, communityEmojis } from "@/lib/community-emojis";
+import { communityEmojiImage, communityEmojis, selectableCommunityEmojis } from "@/lib/community-emojis";
 import { colours, radius, spacing } from "@/lib/theme";
 
 type MemberHit = { handle: string; name: string };
@@ -146,7 +146,7 @@ export function RichComposer({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.emojiTray}
       >
-        {communityEmojis.map((emoji) => (
+        {selectableCommunityEmojis.map((emoji) => (
           <Pressable
             key={emoji.id}
             accessibilityLabel={emoji.label}
