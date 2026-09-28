@@ -44,6 +44,10 @@ export default function OpportunityScreen() {
       </Screen>
     );
   const expired = item.status === "expired";
+  const disclosure = item.disclosure?.trim();
+  const displayedDisclosure = disclosure && disclosure.toLowerCase() !== "none"
+    ? disclosure
+    : "Direct, untracked link. No Ways2Earn referral code.";
 
   async function act(body: Record<string, unknown>) {
     if (!signedIn) {
@@ -140,12 +144,10 @@ export default function OpportunityScreen() {
           </Pressable>
         </View>
       </View>
-      {item.disclosure && item.disclosure !== "None" ? (
-        <View style={styles.disclosure}>
-          <Text style={styles.disclosureTitle}>Affiliate disclosure</Text>
-          <Text style={styles.body}>{item.disclosure}</Text>
-        </View>
-      ) : null}
+      <View style={styles.disclosure}>
+        <Text style={styles.disclosureTitle}>Affiliate disclosure</Text>
+        <Text style={styles.body}>{displayedDisclosure}</Text>
+      </View>
       <View style={styles.actions}>
         <Pressable onPress={() => void visit()} style={styles.primary}>
           <Text style={styles.primaryText}>
