@@ -4,7 +4,7 @@ import * as WebBrowser from "expo-web-browser";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { Platform } from "react-native";
 
-import type { Feed, Member } from "./types";
+import type { Feed, Member, Opportunity } from "./types";
 
 export const API_ORIGIN =
   process.env.EXPO_PUBLIC_API_ORIGIN ?? "https://www.ways2earn.com";
@@ -161,7 +161,21 @@ export async function resendConfirmation(email: string) {
   });
 }
 
-export const getFeed = () => request<Feed>();
+export const getFeed = () => request<Feed>("?view=mobileOverview");
+export type OpportunityPage = { items: Opportunity[]; nextOffset: number | null; categories: string[] };
+export function getOpportunities(options: { type?: Opportunity["type"]; category?: string; query?: string; showExpired?: boolean; offset?: number; mode?: "feed" | "saved" | "hidden" }) {
+  const { type = "Earn", category = "All", query = "", showExpired = false, offset = 0, mode = "feed" } = options;
+  const view = mode === "saved" ? "mobileSaved" : mode === "hidden" ? "mobileHidden" : "mobileOpportunities";
+  const params = new URLSearchParams({ view, offset: String(offset) });
+  if (mode === "feed") {
+    params.set("type", type);
+    if (category !== "All") params.set("category", category);
+    if (query.trim()) params.set("q", query.trim());
+    if (showExpired) params.set("expired", "1");
+  }
+  return request<OpportunityPage>(`?${params.toString()}`);
+}
+export const getOpportunity = (id: string) => request<{ item: Opportunity }>(`?view=mobileOpportunity&id=${encodeURIComponent(id)}`);
 export const mutate = <T = { ok: true }>(body: Record<string, unknown>) =>
   request<T>("", body);
 

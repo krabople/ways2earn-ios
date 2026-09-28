@@ -2,35 +2,44 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useMemo, useState } from "react";
-import { Alert, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { MessageState } from "@/components/states";
 import { Screen } from "@/components/screen";
 import { CommunityBody } from "@/components/community-body";
 import { CommentsThread } from "@/components/comments-thread";
-import { API_ORIGIN, assetUrl } from "@/lib/api";
+import { API_ORIGIN, assetUrl, getOpportunity } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
-import { age } from "@/lib/types";
+import { age, type Opportunity } from "@/lib/types";
 import { useApp } from "@/providers/app-provider";
 
 export default function OpportunityScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const { feed, signedIn, action } = useApp();
+  const { signedIn, action } = useApp();
   const [busy, setBusy] = useState(false);
-  const item = useMemo(
-    () =>
-      feed?.opportunities.find(
-        (entry) => entry.slug === slug || entry.id === slug,
-      ),
-    [feed, slug],
-  )!;
+  const [item, setItem] = useState<Opportunity | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportDetails, setReportDetails] = useState("");
+  const reasons = ["Expired", "Misleading terms", "Inappropriate or abusive", "Unsafe or suspicious", "Duplicate", "Other"];
+  const reload = useCallback(async () => {
+    if (!slug) return;
+    setLoading(true);
+    try { const result = await getOpportunity(slug); setItem(result.item); setLoadError(""); }
+    catch (problem) { setLoadError(problem instanceof Error ? problem.message : "Could not load this post."); }
+    finally { setLoading(false); }
+  }, [slug]);
+  useEffect(() => { void reload(); }, [reload, signedIn]);
+  if (loading && !item) return <Screen title="Opportunity"><MessageState title="Loading post" body="Please wait a moment." /></Screen>;
   if (!item)
     return (
       <Screen title="Opportunity">
         <MessageState
           title="Post unavailable"
-          body="It may be awaiting review or may have been removed."
+          body={loadError || "It may be awaiting review or may have been removed."}
         />
       </Screen>
     );
@@ -45,6 +54,7 @@ export default function OpportunityScreen() {
     try {
       await Haptics.selectionAsync();
       await action(body);
+      await reload();
     } catch (problem) {
       Alert.alert(
         "Could not update",
@@ -55,7 +65,7 @@ export default function OpportunityScreen() {
     }
   }
   async function visit() {
-    if (!item.sourceUrl) {
+    if (!item?.sourceUrl) {
       Alert.alert(
         "Source unavailable",
         "This post does not currently have a website link.",
@@ -66,6 +76,20 @@ export default function OpportunityScreen() {
       presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
       controlsColor: colours.green,
     });
+  }
+  async function submitReport() {
+    if (!item) return;
+    if (!reportReason) { Alert.alert("Choose a reason", "Please tell us why you're reporting this post."); return; }
+    setBusy(true);
+    try {
+      await action({ action: "report", id: item.id, reason: reportReason, details: reportDetails.trim() });
+      setReportOpen(false);
+      setReportReason("");
+      setReportDetails("");
+      Alert.alert("Report sent", "A moderator will review your report.");
+    } catch (problem) {
+      Alert.alert("Could not send report", problem instanceof Error ? problem.message : "Please try again.");
+    } finally { setBusy(false); }
   }
 
   return (
@@ -181,17 +205,24 @@ export default function OpportunityScreen() {
       </View>
       <CommentsThread kind="opportunity" id={item.id} />
       <Pressable
-        onPress={() =>
-          void act({
-            action: "report",
-            id: item.id,
-            reason: "Other",
-            details: "Reported from the iOS app for moderator review.",
-          })
-        }
+        onPress={() => signedIn ? setReportOpen(true) : router.push("/login")}
       >
         <Text style={styles.report}>Report this post</Text>
       </Pressable>
+      <Modal visible={reportOpen} transparent animationType="fade" onRequestClose={() => setReportOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.reportCard}>
+            <Text style={styles.sectionTitle}>Report this post</Text>
+            <Text style={styles.body}>Choose what needs a moderator&apos;s attention.</Text>
+            {reasons.map((reason) => <Pressable key={reason} accessibilityRole="radio" accessibilityState={{ selected: reportReason === reason }} onPress={() => setReportReason(reason)} style={[styles.reasonRow, reportReason === reason && styles.reasonSelected]}><Text style={styles.reasonText}>{reportReason === reason ? "◉" : "○"}  {reason}</Text></Pressable>)}
+            <TextInput accessibilityLabel="Report details" placeholder="Add any useful details (optional)" placeholderTextColor={colours.slate} value={reportDetails} onChangeText={setReportDetails} multiline maxLength={3000} style={styles.reportInput} />
+            <View style={styles.reportButtons}>
+              <Pressable disabled={busy} onPress={() => setReportOpen(false)} style={styles.secondary}><Text style={styles.secondaryText}>Cancel</Text></Pressable>
+              <Pressable disabled={busy || !reportReason} onPress={() => void submitReport()} style={[styles.primary, (busy || !reportReason) && styles.disabled]}><Text style={styles.primaryText}>Send report</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -339,4 +370,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     textDecorationLine: "underline",
   },
+  modalBackdrop: { flex: 1, justifyContent: "center", padding: spacing.lg, backgroundColor: "#102A4688" },
+  reportCard: { padding: spacing.lg, gap: spacing.sm, borderRadius: radius.lg, backgroundColor: colours.surface },
+  reasonRow: { padding: spacing.md, borderWidth: 1, borderColor: colours.line, borderRadius: radius.sm },
+  reasonSelected: { borderColor: colours.green, backgroundColor: colours.mintPale },
+  reasonText: { color: colours.ink, fontSize: 14 },
+  reportInput: { minHeight: 80, maxHeight: 150, padding: spacing.md, borderWidth: 1, borderColor: colours.line, borderRadius: radius.sm, textAlignVertical: "top", color: colours.ink },
+  reportButtons: { flexDirection: "row", justifyContent: "flex-end", gap: spacing.sm },
+  disabled: { opacity: 0.5 },
 });

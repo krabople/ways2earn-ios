@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,49 +13,117 @@ import {
 import { OpportunityCard } from "@/components/opportunity-card";
 import { Screen } from "@/components/screen";
 import { MessageState } from "@/components/states";
+import { getOpportunities } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
+import type { Opportunity } from "@/lib/types";
 import { useApp } from "@/providers/app-provider";
 
 const types = ["Earn", "Freebie", "Deal"] as const;
+const typeColours = { Earn: colours.navy, Freebie: "#087753", Deal: "#9B433C" };
+const typeBackgrounds = { Earn: "#E8EEF4", Freebie: "#E8F8F2", Deal: "#F9ECEA" };
 
 export default function DiscoverScreen() {
-  const { feed, loading, error, refresh, action, signedIn } = useApp();
+  const { loading, error, refresh, action, signedIn } = useApp();
   const [type, setType] = useState<(typeof types)[number]>("Earn");
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [showExpired, setShowExpired] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [hideError, setHideError] = useState("");
-  const hidden = (feed?.opportunities ?? []).filter((item) => item.hidden);
-  const categories = useMemo(
-    () => [
-      "All",
-      ...new Set(
-        (feed?.opportunities ?? [])
-          .filter((item) => item.type === type)
-          .map((item) => item.category),
-      ),
-    ],
-    [feed, type],
-  );
-  const items = useMemo(
-    () =>
-      (feed?.opportunities ?? []).filter(
-        (item) =>
-          item.type === type &&
-          !item.hidden &&
-          (showExpired || item.status !== "expired") &&
-          (category === "All" || item.category === category) &&
-          (!query.trim() ||
-            `${item.title} ${item.summary} ${item.merchant}`
-              .toLowerCase()
-              .includes(query.trim().toLowerCase())),
-      ),
-    [category, feed, query, showExpired, type],
-  );
+  const [items, setItems] = useState<Opportunity[]>([]);
+  const [categories, setCategories] = useState<string[]>(["All"]);
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [moreLoading, setMoreLoading] = useState(false);
+  const [pageError, setPageError] = useState("");
+  const [hidden, setHidden] = useState<Opportunity[]>([]);
+  const [hiddenNextOffset, setHiddenNextOffset] = useState<number | null>(null);
+  const [hiddenLoading, setHiddenLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const generation = useRef(0);
+  const loadingMore = useRef(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const loadFirst = useCallback(async () => {
+    const current = ++generation.current;
+    setPageLoading(true);
+    setPageError("");
+    setItems([]);
+    setNextOffset(null);
+    try {
+      const page = await getOpportunities({ type, category, query: search, showExpired });
+      if (current !== generation.current) return;
+      setItems(page.items);
+      setNextOffset(page.nextOffset);
+      setCategories(["All", ...page.categories]);
+    } catch (problem) {
+      if (current === generation.current) setPageError(problem instanceof Error ? problem.message : "Could not load posts.");
+    } finally {
+      if (current === generation.current) setPageLoading(false);
+    }
+  }, [type, category, search, showExpired]);
+
+  useEffect(() => { void loadFirst(); return () => { generation.current += 1; }; }, [loadFirst, signedIn]);
+
+  const loadMore = useCallback(async () => {
+    if (nextOffset === null || pageLoading || loadingMore.current || pageError) return;
+    loadingMore.current = true;
+    setMoreLoading(true);
+    const current = generation.current;
+    try {
+      const page = await getOpportunities({ type, category, query: search, showExpired, offset: nextOffset });
+      if (current !== generation.current) return;
+      setItems((previous) => [...previous, ...page.items.filter((item) => !previous.some((old) => old.id === item.id))]);
+      setNextOffset(page.nextOffset);
+    } catch (problem) {
+      if (current === generation.current) setPageError(problem instanceof Error ? problem.message : "Could not load more posts.");
+    } finally {
+      loadingMore.current = false;
+      setMoreLoading(false);
+    }
+  }, [nextOffset, pageLoading, pageError, type, category, search, showExpired]);
+
+  const loadHidden = useCallback(async (offset = 0) => {
+    if (hiddenLoading) return;
+    setHiddenLoading(true);
+    try {
+      const page = await getOpportunities({ mode: "hidden", offset });
+      setHidden((previous) => offset ? [...previous, ...page.items] : page.items);
+      setHiddenNextOffset(page.nextOffset);
+    } catch (problem) {
+      setHideError(problem instanceof Error ? problem.message : "Could not load hidden posts.");
+    } finally { setHiddenLoading(false); }
+  }, [hiddenLoading]);
+
+  async function unhide(item: Opportunity) {
+    try {
+      await action({ action: "hidePost", id: item.id, hidden: false });
+      setHidden((previous) => previous.filter((entry) => entry.id !== item.id));
+      void loadFirst();
+    } catch (problem) { setHideError(problem instanceof Error ? problem.message : "Could not unhide post."); }
+  }
+
+  async function onRefresh() {
+    await Promise.all([refresh(), loadFirst(), ...(showHidden ? [loadHidden()] : [])]);
+  }
 
   return (
-    <Screen refreshing={loading} onRefresh={() => void refresh()}>
+    <Screen scroll={false}>
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.feedContent}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderItem={({ item }) => <OpportunityCard item={item} onHidden={() => { setItems((previous) => previous.filter((entry) => entry.id !== item.id)); if (showHidden) void loadHidden(); }} />}
+        onEndReached={() => void loadMore()}
+        onEndReachedThreshold={0.4}
+        refreshing={loading || pageLoading}
+        onRefresh={() => void onRefresh()}
+        ListHeaderComponent={<View style={styles.controls}>
       <View style={styles.intro}>
         <Text style={styles.eyebrow}>COMMUNITY-CHECKED IDEAS</Text>
         <Text style={styles.heading}>Find a better way to earn.</Text>
@@ -80,13 +150,13 @@ export default function DiscoverScreen() {
             }}
             style={[
               styles.segmentButton,
-              type === item && styles.segmentActive,
+              { backgroundColor: type === item ? typeColours[item] : typeBackgrounds[item] },
             ]}
           >
             <Text
               style={[
                 styles.segmentText,
-                type === item && styles.segmentTextActive,
+                { color: type === item ? colours.surface : typeColours[item] },
               ]}
             >
               {item === "Earn"
@@ -136,42 +206,42 @@ export default function DiscoverScreen() {
           </Text>
         </View>
       </Pressable>
-      {signedIn ? <Text style={styles.swipeHint}>Swipe a post left to hide it from your feed.</Text> : null}
       {error ? <MessageState title="Unable to refresh" body={error} /> : null}
       {signedIn ? (
         <View style={styles.hiddenSection}>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHidden }} onPress={() => setShowHidden(!showHidden)}>
-            <Text style={styles.hiddenHeading}>Hidden posts ({hidden.length}) {showHidden ? "▴" : "▾"}</Text>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHidden }} onPress={() => { if (!showHidden) void loadHidden(); setShowHidden(!showHidden); }}>
+            <Text style={styles.hiddenHeading}>Hidden posts {showHidden ? "▴" : "▾"}</Text>
           </Pressable>
           {showHidden ? hidden.length ? hidden.map((item) => (
             <View key={item.id} style={styles.hiddenRow}>
               <Text numberOfLines={2} style={styles.hiddenTitle}>{item.title}</Text>
-              <Pressable accessibilityLabel={`Unhide ${item.title}`} onPress={() => void action({ action: "hidePost", id: item.id, hidden: false }).catch((problem) => setHideError(problem instanceof Error ? problem.message : "Could not unhide post."))}>
+              <Pressable accessibilityLabel={`Unhide ${item.title}`} onPress={() => void unhide(item)}>
                 <Text style={styles.unhide}>Unhide</Text>
               </Pressable>
             </View>
-          )) : <Text style={styles.expiredHint}>No hidden posts yet. Swipe a feed card left to hide it.</Text> : null}
+          )) : !hiddenLoading ? <Text style={styles.expiredHint}>No hidden posts yet.</Text> : null : null}
+          {showHidden && hiddenNextOffset !== null ? <Pressable onPress={() => void loadHidden(hiddenNextOffset)}><Text style={styles.unhide}>Load more hidden posts</Text></Pressable> : null}
           {hideError ? <Text style={styles.expiredHint}>{hideError}</Text> : null}
         </View>
       ) : null}
-      <View style={styles.list}>
-        {items.map((item) => (
-          <OpportunityCard key={item.id} item={item} />
-        ))}
-      </View>
-      {!loading && !items.length ? (
+      </View>}
+        ListEmptyComponent={!pageLoading && !pageError ? (
         <MessageState
           title="Nothing matches yet"
           body="Try another category or clear your search."
         />
       ) : null}
+        ListFooterComponent={moreLoading ? <ActivityIndicator color={colours.green} /> : pageError ? <Pressable onPress={() => void (items.length ? loadMore() : loadFirst())}><Text style={styles.unhide}>{pageError} Tap to retry.</Text></Pressable> : null}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   hiddenSection: { gap: 10, paddingVertical: 14 },
-  swipeHint: { color: colours.slate, fontSize: 11 },
+  feedContent: { padding: spacing.lg, paddingBottom: 110 },
+  controls: { gap: spacing.lg, marginBottom: spacing.lg },
+  separator: { height: spacing.md },
   hiddenHeading: { color: colours.ink, fontWeight: "700", fontSize: 14 },
   hiddenRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: colours.surface, borderRadius: radius.md },
   hiddenTitle: { flex: 1, color: colours.ink, fontSize: 13 },
@@ -202,24 +272,15 @@ const styles = StyleSheet.create({
   },
   segment: {
     flexDirection: "row",
-    padding: 4,
-    borderRadius: radius.md,
-    backgroundColor: "#E7ECEF",
+    gap: 6,
   },
   segmentButton: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 10,
-    borderRadius: 9,
-  },
-  segmentActive: {
-    backgroundColor: colours.surface,
-    shadowColor: colours.navy,
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
+    paddingVertical: 11,
+    borderRadius: radius.md,
   },
   segmentText: { color: colours.slate, fontWeight: "700", fontSize: 13 },
-  segmentTextActive: { color: colours.green },
   chips: { gap: 8 },
   chip: {
     paddingHorizontal: 14,
@@ -262,5 +323,4 @@ const styles = StyleSheet.create({
   expiredCopy: { flex: 1, minWidth: 0 },
   expiredLabel: { color: colours.ink, fontSize: 13, fontWeight: "800" },
   expiredHint: { color: colours.slate, fontSize: 10, marginTop: 2 },
-  list: { gap: spacing.md },
 });

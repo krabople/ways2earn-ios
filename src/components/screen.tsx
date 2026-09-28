@@ -48,12 +48,14 @@ export function Screen({
   back,
   refreshing,
   onRefresh,
+  scroll = true,
 }: PropsWithChildren<{
   title?: string;
   action?: ReactNode;
   back?: boolean | string;
   refreshing?: boolean;
   onRefresh?: () => void;
+  scroll?: boolean;
 }>) {
   return (
     <SafeAreaView edges={["top"]} style={styles.safe}>
@@ -74,7 +76,7 @@ export function Screen({
         </View>
         {action}
       </View>
-      <ScrollView
+      {scroll ? <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
@@ -90,7 +92,7 @@ export function Screen({
         }
       >
         {children}
-      </ScrollView>
+      </ScrollView> : children}
     </SafeAreaView>
   );
 }

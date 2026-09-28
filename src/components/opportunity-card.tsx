@@ -11,7 +11,7 @@ import type { Opportunity } from "@/lib/types";
 import { age } from "@/lib/types";
 import { useApp } from "@/providers/app-provider";
 
-export function OpportunityCard({ item }: { item: Opportunity }) {
+export function OpportunityCard({ item, onHidden }: { item: Opportunity; onHidden?: () => void }) {
   const { action, signedIn } = useApp();
   const expired = item.status === "expired";
   const hiding = useRef(false);
@@ -20,7 +20,7 @@ export function OpportunityCard({ item }: { item: Opportunity }) {
     if (!signedIn || hiding.current) return;
     hiding.current = true;
     setHideError("");
-    void action({ action: "hidePost", id: item.id, hidden: true }).catch((problem) => {
+    void action({ action: "hidePost", id: item.id, hidden: true }).then(() => onHidden?.()).catch((problem) => {
       hiding.current = false;
       setHideError(problem instanceof Error ? problem.message : "Could not hide this post.");
     });
