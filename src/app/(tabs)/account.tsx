@@ -44,6 +44,7 @@ export default function AccountScreen() {
             <Text style={styles.guestLink}>Create an account</Text>
           </Pressable>
         </View>
+        <TourLink />
         <LegalLinks />
       </Screen>
     );
@@ -158,6 +159,7 @@ export default function AccountScreen() {
           void linkAppleAccount().then(async user => { if (user) { setAppleLinked(true); await refresh(); } }).catch(problem => Alert.alert("Could not connect Apple", problem instanceof Error ? problem.message : "Please try again.")).finally(() => setLinkBusy(false));
         }} />
       </View> : null}
+      <TourLink />
       <LegalLinks />
       <Pressable
         style={styles.signOut}
@@ -184,7 +186,7 @@ function Row({
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.row}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.row}>
       <View style={styles.rowCopy}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.help}>{subtitle}</Text>
@@ -205,6 +207,18 @@ function LegalLinks() {
       <Pressable onPress={() => router.push("/support" as never)}>
         <Text style={styles.link}>Contact support</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function TourLink() {
+  return (
+    <View style={styles.group}>
+      <Row
+        title="App tour"
+        subtitle="A quick guide to getting the most from Ways2Earn"
+        onPress={() => router.push("/tutorial")}
+      />
     </View>
   );
 }
