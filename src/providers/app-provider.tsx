@@ -21,6 +21,7 @@ import {
   signOut as apiSignOut,
   token,
 } from "@/lib/api";
+import { notificationRoute } from "@/lib/notification-route";
 import type { Feed } from "@/lib/types";
 
 type AppContextValue = {
@@ -79,7 +80,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     const response = Notifications.addNotificationResponseReceivedListener(
       (event) => {
         const href = event.notification.request.content.data?.href;
-        if (typeof href === "string") router.push(href as never);
+        if (typeof href === "string") router.push(notificationRoute(href) as never);
       },
     );
     return () => response.remove();

@@ -5,6 +5,7 @@ import { Screen } from "@/components/screen";
 import { MessageState } from "@/components/states";
 import { colours, radius, spacing } from "@/lib/theme";
 import { age } from "@/lib/types";
+import { notificationRoute } from "@/lib/notification-route";
 import { useApp } from "@/providers/app-provider";
 
 export default function AlertsScreen() {
@@ -48,7 +49,7 @@ export default function AlertsScreen() {
               key={item.id}
               onPress={() =>
                 void action({ action: "readNotification", id: item.id }).then(
-                  () => router.push(payload.href as never),
+                  () => router.push(notificationRoute(payload.href) as never),
                 )
               }
               style={[styles.alert, !item.read_at && styles.unread]}
