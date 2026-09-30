@@ -10,17 +10,27 @@ import {
 } from "react-native";
 
 import { Screen } from "@/components/screen";
-import { request } from "@/lib/api";
+import { prepareAppleAccountDeletion, request } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import { useApp } from "@/providers/app-provider";
 
 export default function CloseAccountScreen() {
-  const { feed, action, signOut } = useApp();
+  const { feed, signOut } = useApp();
   const [confirmation, setConfirmation] = useState("");
   const [password, setPassword] = useState("");
   const [socialConfirmation, setSocialConfirmation] = useState("");
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
-  useEffect(() => { void request<{ hasPassword: boolean }>("?view=my").then(data => setHasPassword(data.hasPassword)).catch(() => setHasPassword(null)); }, []);
+  const [appleLinked, setAppleLinked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  async function load() {
+    setLoadError("");
+    try {
+      const data = await request<{ hasPassword: boolean; linkedProviders: string[] }>("?view=my");
+      setHasPassword(data.hasPassword); setAppleLinked(data.linkedProviders.includes("apple"));
+    } catch { setHasPassword(null); setLoadError("Could not load your account. Please try again."); }
+  }
+  useEffect(() => { void load(); }, []);
   const phrase = `DELETE @${feed?.user?.handle ?? ""}`;
   function close() {
     Alert.alert(
@@ -32,9 +42,15 @@ export default function CloseAccountScreen() {
           text: "Permanently close",
           style: "destructive",
           onPress: async () => {
-            await action({ action: "deleteAccount", confirmation, password, socialConfirmation });
-            await signOut();
-            router.replace("/");
+            setBusy(true);
+            try {
+              if (appleLinked && !(await prepareAppleAccountDeletion())) return;
+              await request("", { action: "deleteAccount", confirmation, password, socialConfirmation });
+              await signOut();
+              router.replace("/");
+            } catch (problem) {
+              Alert.alert("Account not closed", problem instanceof Error ? problem.message : "Please try again.");
+            } finally { setBusy(false); }
           },
         },
       ],
@@ -45,17 +61,19 @@ export default function CloseAccountScreen() {
       <View style={styles.warning}>
         <Text style={styles.title}>This cannot be undone</Text>
         <Text style={styles.body}>
-          Your account and associated personal data will be deleted.
-          Contributions that must remain to preserve conversations will be
-          anonymised as described in the privacy policy.
+          Your profile, posts, comments, uploaded images, sent messages, earnings
+          and account settings will be deleted. Empty placeholders may remain
+          where needed to preserve other members’ replies. This cannot be undone.
         </Text>
       </View>
       <View style={styles.form}>
+        {loadError ? <Pressable onPress={() => void load()}><Text style={styles.body}>{loadError} Tap to retry.</Text></Pressable> : null}
+        {appleLinked ? <Text style={styles.body}>Apple will ask you to confirm the connected Apple Account so we can disconnect it as part of deletion.</Text> : null}
         <Text style={styles.label}>
           Type <Text style={styles.phrase}>{phrase}</Text>
         </Text>
         <TextInput
-          autoCapitalize="characters"
+          autoCapitalize="none"
           value={confirmation}
           onChangeText={setConfirmation}
           style={styles.input}
@@ -68,14 +86,14 @@ export default function CloseAccountScreen() {
           <TextInput secureTextEntry value={password} onChangeText={setPassword} style={styles.input} />
         </>}
         <Pressable
-          disabled={confirmation !== phrase || hasPassword === null || (hasPassword ? !password : socialConfirmation !== "CLOSE MY ACCOUNT")}
+          disabled={busy || confirmation !== phrase || hasPassword === null || (hasPassword ? !password : socialConfirmation !== "CLOSE MY ACCOUNT")}
           onPress={close}
           style={[
             styles.danger,
-            (confirmation !== phrase || hasPassword === null || (hasPassword ? !password : socialConfirmation !== "CLOSE MY ACCOUNT")) && styles.disabled,
+            (busy || confirmation !== phrase || hasPassword === null || (hasPassword ? !password : socialConfirmation !== "CLOSE MY ACCOUNT")) && styles.disabled,
           ]}
         >
-          <Text style={styles.dangerText}>Permanently close account</Text>
+          <Text style={styles.dangerText}>{busy ? "Closing account…" : "Permanently close account"}</Text>
         </Pressable>
       </View>
     </Screen>

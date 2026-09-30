@@ -35,6 +35,11 @@ export default function PrivacyScreen() {
           not post to your Apple or Facebook account, and email sign-in remains
           available.
         </Paragraph>
+        <Paragraph>
+          Apple refresh tokens are encrypted in private server storage, using a
+          separate private encryption key. They allow us to disconnect Apple
+          authorization when you close your account, not to track advertising.
+        </Paragraph>
       </ArticleSection>
       <ArticleSection title="What the app stores" tone="green">
         <Bullet>
@@ -67,6 +72,18 @@ export default function PrivacyScreen() {
           You can sign out, disable push notifications or close your account
           from the Account tab. To request access, correction or deletion,
           contact the team through the in-app support screen.
+        </Paragraph>
+        <Paragraph light>
+          Closing your account deletes your profile information, authored posts
+          and comments, uploads, sent messages, support requests, earnings and
+          account settings from the active service. Empty, anonymised placeholders
+          may remain to preserve other members’ replies; other people’s own
+          messages are not deleted. Apple authorization is also revoked, and you
+          may need to confirm your connected Apple Account first.
+        </Paragraph>
+        <Paragraph light>
+          Contact admin@ways2earn.com with questions about older migrated records,
+          hosting backups, or if you cannot sign in to request help.
         </Paragraph>
       </ArticleSection>
     </Screen>

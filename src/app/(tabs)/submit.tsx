@@ -183,8 +183,10 @@ export default function SubmitScreen() {
           : "Your discussion is now live.",
         [
           {
-            text: "View discussion",
-            onPress: () => router.replace(`/community/${result.id}`),
+            text: result.held ? "OK" : "View discussion",
+            onPress: result.held
+              ? undefined
+              : () => router.replace(`/community/${result.id}`),
           },
         ],
       );

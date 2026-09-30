@@ -94,13 +94,29 @@ async function nativeAppleSignIn(link: boolean) {
       if (problem && typeof problem === "object" && "code" in problem && problem.code === "ERR_REQUEST_CANCELED") return null;
       throw problem;
     }
-    if (!credential.identityToken) throw new ApiError("Apple did not return an identity token.");
+    if (!credential.identityToken || !credential.authorizationCode) throw new ApiError("Apple did not return a complete sign-in response. Please try again.");
     const name = [credential.fullName?.givenName, credential.fullName?.familyName].filter(Boolean).join(" ");
     const result = await request<{ token: string; user: Member }>("/session", {
-      action: "appleNative", nonce, identityToken: credential.identityToken, name,
+      action: "appleNative", nonce, identityToken: credential.identityToken, authorizationCode: credential.authorizationCode, name,
     });
     await saveToken(result.token);
     return result.user;
+}
+
+export async function prepareAppleAccountDeletion() {
+  const { nonce } = await request<{ nonce: string }>("/auth/apple/challenge?delete=1");
+  let credential: AppleAuthentication.AppleAuthenticationCredential;
+  try {
+    credential = await AppleAuthentication.signInAsync({ nonce });
+  } catch (problem) {
+    if (problem && typeof problem === "object" && "code" in problem && problem.code === "ERR_REQUEST_CANCELED") return false;
+    throw problem;
+  }
+  if (!credential.identityToken || !credential.authorizationCode) throw new ApiError("Apple did not return a complete confirmation. Please try again.");
+  await request<{ ok: true }>("/session", {
+    action: "appleNative", nonce, identityToken: credential.identityToken, authorizationCode: credential.authorizationCode,
+  });
+  return true;
 }
 
 export async function linkAppleAccount() {

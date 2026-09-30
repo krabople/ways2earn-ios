@@ -100,7 +100,7 @@ export function CommentsThread({
     }
     setBusy(true);
     try {
-      await action({
+      const result = await action<{ held?: boolean }>({
         action: "comment",
         kind,
         id,
@@ -110,6 +110,12 @@ export function CommentsThread({
       setBody("");
       setReplyTo(null);
       await load();
+      if (result.held) {
+        Alert.alert(
+          "Sent for review",
+          "Your comment is not public yet. A moderator will check its content and any images before it appears.",
+        );
+      }
     } catch (problem) {
       Alert.alert(
         "Could not post",
