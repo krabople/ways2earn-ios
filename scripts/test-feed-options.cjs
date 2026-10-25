@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const source = fs.readFileSync(path.join(__dirname, '../src/app/(tabs)/index.tsx'), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-let slots = [], cursor = 0, signedIn = true;
+let slots = [], cursor = 0, signedIn = true, hiddenItems = [{ id: 'hidden-1', title: 'Hidden example' }];
 const actions = [];
 const react = {
   useState(initial) { const index = cursor++; if (!(index in slots)) slots[index] = initial; return [slots[index], (value) => { slots[index] = typeof value === 'function' ? value(slots[index]) : value; }]; },
@@ -27,7 +27,7 @@ vm.runInNewContext(code, {
     if (name.endsWith('/screen')) return { Screen: 'Screen' };
     if (name.endsWith('/states')) return { MessageState: 'MessageState' };
     if (name.endsWith('/opportunity-card')) return { OpportunityCard: 'OpportunityCard' };
-    if (name.endsWith('/api')) return { getOpportunities: async () => ({ items: [{ id: 'hidden-1', title: 'Hidden example' }], nextOffset: null, categories: [] }) };
+    if (name.endsWith('/api')) return { getOpportunities: async () => ({ items: hiddenItems, nextOffset: null, categories: [] }) };
     if (name.endsWith('/theme')) return { colours: {}, radius: {}, spacing: {} };
     if (name.endsWith('/app-provider')) return { useApp: () => ({ feed: { user: signedIn ? { id: 'member' } : null }, signedIn, refresh: async () => {}, action: async (value) => { actions.push(value); } }) };
     throw new Error(`Unexpected import: ${name}`);
@@ -59,6 +59,18 @@ async function main() {
   await find(modal(tree), (node) => node.props?.accessibilityLabel === 'Unhide Hidden example').props.onPress();
   assert.equal(actions[0].action, 'hidePost');
   assert.equal(actions[0].hidden, false);
+  // Both the heading and empty-state copy must start at the section's left edge.
+  const hiddenToggle = find(modal(tree), (node) => node.type === 'Pressable' && node.props?.accessibilityState?.expanded === true);
+  assert.equal(Object.assign({}, ...hiddenToggle.props.style).paddingHorizontal, 0);
+  hiddenItems = [];
+  hiddenToggle.props.onPress();
+  tree = render();
+  find(modal(tree), (node) => node.type === 'Pressable' && node.props?.accessibilityState?.expanded === false).props.onPress();
+  await new Promise(setImmediate);
+  tree = render();
+  const empty = find(modal(tree), (node) => node.type === 'Text' && node.props?.children === 'No hidden posts yet. Swipe left on a post to hide it.');
+  assert.equal(empty.props.style.paddingHorizontal ?? 0, 0);
+  assert.equal(empty.props.style.marginLeft ?? 0, 0);
   find(modal(tree), (node) => node.type === 'Screen').props.action.props.onPress();
   assert.equal(modal(render()).props.visible, false);
   tree.props.action.props.onPress();
@@ -66,6 +78,6 @@ async function main() {
   assert.equal(modal(render()).props.visible, false);
   signedIn = false; slots = []; tree = render();
   assert.ok(!JSON.stringify(modal(tree)).includes('Hidden posts'));
-  console.log('PASS: compact header menu, listings immediately after sort, expired toggle, hidden/unhide, Done/back dismissal, guest access.');
+  console.log('PASS: compact header menu, listings immediately after sort, expired toggle, hidden/unhide, aligned empty state, Done/back dismissal, guest access.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

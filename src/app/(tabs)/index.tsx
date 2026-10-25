@@ -371,7 +371,7 @@ export default function DiscoverScreen() {
       </Pressable>
       {signedIn ? (
         <View style={styles.hiddenSection}>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHidden }} onPress={() => { if (!showHidden) void loadHidden(); setShowHidden(!showHidden); }} style={styles.optionsButton}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHidden }} onPress={() => { if (!showHidden) void loadHidden(); setShowHidden(!showHidden); }} style={[styles.optionsButton, styles.hiddenToggle]}>
             <Text style={styles.hiddenHeading}>Hidden posts {showHidden ? "▴" : "▾"}</Text>
           </Pressable>
           {showHidden ? hidden.length ? hidden.map((item) => (
@@ -402,6 +402,7 @@ const styles = StyleSheet.create({
   sortActive: { backgroundColor: colours.navy, borderColor: colours.navy },
   sortTextActive: { color: colours.surface },
   hiddenSection: { gap: 10, paddingVertical: 14 },
+  hiddenToggle: { paddingHorizontal: 0 },
   feedContent: { padding: spacing.lg, paddingBottom: 110 },
   controls: { gap: spacing.lg, marginBottom: spacing.lg },
   separator: { height: spacing.md },
