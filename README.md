@@ -7,6 +7,7 @@ A native Expo/React Native client for the Ways2Earn community. It shares the liv
 - Six-step first-use app tour with practice feed controls, Skip/Back, and replay from Account → App tour (also available to guests)
 - Earn, freebie and deal discovery with search, categories, weighted voting and saved posts
 - Visible Hottest / Newest / Most discussed feed controls; Hottest is the default. Sorting happens server-side before 20-item pagination, and first-page caches are isolated by viewer, tab and sort order.
+- A compact Options button in the Discover header opens expired-post controls and hidden-post management in a separate sheet, keeping listings directly below the sort controls.
 - Opportunity detail, trust information, outcomes, progress, comments, reactions, reporting and native sharing
 - Community discussions and replies
 - Member messages, alerts and email-alert preferences

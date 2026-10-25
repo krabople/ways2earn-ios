@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -43,6 +44,7 @@ export default function DiscoverScreen() {
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [showExpired, setShowExpired] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [hideError, setHideError] = useState("");
   const [items, setItems] = useState<Opportunity[]>([]);
@@ -176,6 +178,7 @@ export default function DiscoverScreen() {
 
   const loadHidden = useCallback(async (offset = 0) => {
     if (hiddenLoading) return;
+    setHideError("");
     setHiddenLoading(true);
     try {
       const page = await getOpportunities({ mode: "hidden", offset });
@@ -199,7 +202,18 @@ export default function DiscoverScreen() {
   }
 
   return (
-    <Screen scroll={false}>
+    <Screen scroll={false} action={
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Feed options"
+        accessibilityHint="Show expired posts or manage hidden posts"
+        accessibilityState={{ expanded: optionsOpen }}
+        onPress={() => setOptionsOpen(true)}
+        style={styles.optionsButton}
+      >
+        <Text style={styles.optionsLabel}>Options{showExpired ? " •" : ""}</Text>
+      </Pressable>
+    }>
       <FlatList
         ref={listRef}
         data={items}
@@ -297,6 +311,7 @@ export default function DiscoverScreen() {
           </Pressable>
         ))}
       </ScrollView>
+      {error ? <MessageState title="Unable to refresh" body={error} /> : null}
       <View style={styles.sortSection}>
         <Text style={styles.expiredLabel}>Sort listings</Text>
         <View style={styles.sortOptions}>
@@ -323,6 +338,21 @@ export default function DiscoverScreen() {
           ))}
         </View>
       </View>
+      </View>}
+        ListEmptyComponent={!pageLoading && !pageError ? (
+        <MessageState
+          title="Nothing matches yet"
+          body="Try another category or clear your search."
+        />
+      ) : null}
+        ListFooterComponent={moreLoading ? <ActivityIndicator color={colours.green} /> : pageError ? <Pressable onPress={() => void (items.length ? loadMore() : loadFirst())}><Text style={styles.unhide}>{pageError} Tap to retry.</Text></Pressable> : null}
+      />
+      <Modal visible={optionsOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOptionsOpen(false)}>
+        <Screen title="Feed options" action={
+          <Pressable accessibilityRole="button" accessibilityLabel="Close feed options" onPress={() => setOptionsOpen(false)} style={styles.optionsButton}>
+            <Text style={styles.unhide}>Done</Text>
+          </Pressable>
+        }>
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: showExpired }}
@@ -339,38 +369,33 @@ export default function DiscoverScreen() {
           </Text>
         </View>
       </Pressable>
-      {error ? <MessageState title="Unable to refresh" body={error} /> : null}
       {signedIn ? (
         <View style={styles.hiddenSection}>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHidden }} onPress={() => { if (!showHidden) void loadHidden(); setShowHidden(!showHidden); }}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHidden }} onPress={() => { if (!showHidden) void loadHidden(); setShowHidden(!showHidden); }} style={styles.optionsButton}>
             <Text style={styles.hiddenHeading}>Hidden posts {showHidden ? "▴" : "▾"}</Text>
           </Pressable>
           {showHidden ? hidden.length ? hidden.map((item) => (
             <View key={item.id} style={styles.hiddenRow}>
               <Text numberOfLines={2} style={styles.hiddenTitle}>{item.title}</Text>
-              <Pressable accessibilityLabel={`Unhide ${item.title}`} onPress={() => void unhide(item)}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Unhide ${item.title}`} onPress={() => void unhide(item)} style={styles.optionsButton}>
                 <Text style={styles.unhide}>Unhide</Text>
               </Pressable>
             </View>
           )) : !hiddenLoading ? <Text style={styles.expiredHint}>No hidden posts yet. Swipe left on a post to hide it.</Text> : null : null}
-          {showHidden && hiddenNextOffset !== null ? <Pressable onPress={() => void loadHidden(hiddenNextOffset)}><Text style={styles.unhide}>Load more hidden posts</Text></Pressable> : null}
-          {hideError ? <Text style={styles.expiredHint}>{hideError}</Text> : null}
+          {showHidden && hiddenLoading ? <ActivityIndicator color={colours.green} /> : null}
+          {showHidden && hiddenNextOffset !== null ? <Pressable disabled={hiddenLoading} onPress={() => void loadHidden(hiddenNextOffset)} style={styles.optionsButton}><Text style={styles.unhide}>Load more hidden posts</Text></Pressable> : null}
+          {hideError ? <Pressable accessibilityRole="button" onPress={() => void loadHidden()} style={styles.optionsButton}><Text style={styles.expiredHint}>{hideError} Tap to retry.</Text></Pressable> : null}
         </View>
       ) : null}
-      </View>}
-        ListEmptyComponent={!pageLoading && !pageError ? (
-        <MessageState
-          title="Nothing matches yet"
-          body="Try another category or clear your search."
-        />
-      ) : null}
-        ListFooterComponent={moreLoading ? <ActivityIndicator color={colours.green} /> : pageError ? <Pressable onPress={() => void (items.length ? loadMore() : loadFirst())}><Text style={styles.unhide}>{pageError} Tap to retry.</Text></Pressable> : null}
-      />
+        </Screen>
+      </Modal>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  optionsButton: { minHeight: 44, minWidth: 44, justifyContent: "center", paddingHorizontal: 8 },
+  optionsLabel: { color: colours.slate, fontSize: 13, fontWeight: "600" },
   sortSection: { gap: 8 },
   sortOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   sortButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: colours.line, borderRadius: radius.pill, backgroundColor: inactiveTabColour },
