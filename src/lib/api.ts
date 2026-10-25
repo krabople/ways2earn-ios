@@ -181,12 +181,14 @@ export async function resendConfirmation(email: string) {
 
 export const getFeed = () => request<Feed>("?view=mobileOverview");
 export type OpportunityPage = { items: Opportunity[]; nextOffset: number | null; categories: string[] };
-export function getOpportunities(options: { type?: Opportunity["type"]; category?: string; query?: string; showExpired?: boolean; offset?: number; mode?: "feed" | "saved" | "hidden" }) {
-  const { type = "Earn", category = "All", query = "", showExpired = false, offset = 0, mode = "feed" } = options;
+export type OpportunitySort = "hot" | "new" | "discussed";
+export function getOpportunities(options: { type?: Opportunity["type"]; category?: string; query?: string; showExpired?: boolean; offset?: number; sort?: OpportunitySort; mode?: "feed" | "saved" | "hidden" }) {
+  const { type = "Earn", category = "All", query = "", showExpired = false, offset = 0, sort = "hot", mode = "feed" } = options;
   const view = mode === "saved" ? "mobileSaved" : mode === "hidden" ? "mobileHidden" : "mobileOpportunities";
   const params = new URLSearchParams({ view, offset: String(offset) });
   if (mode === "feed") {
     params.set("type", type);
+    params.set("sort", sort);
     if (category !== "All") params.set("category", category);
     if (query.trim()) params.set("q", query.trim());
     if (showExpired) params.set("expired", "1");

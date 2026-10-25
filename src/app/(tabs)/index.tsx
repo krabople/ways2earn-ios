@@ -13,7 +13,7 @@ import {
 import { OpportunityCard } from "@/components/opportunity-card";
 import { Screen } from "@/components/screen";
 import { MessageState } from "@/components/states";
-import { getOpportunities, type OpportunityPage } from "@/lib/api";
+import { getOpportunities, type OpportunityPage, type OpportunitySort } from "@/lib/api";
 import { colours, radius, spacing } from "@/lib/theme";
 import type { Opportunity } from "@/lib/types";
 import { useApp } from "@/providers/app-provider";
@@ -23,16 +23,23 @@ type OpportunityType = (typeof types)[number];
 type CachedPage = { page: OpportunityPage; loadedAt: number };
 type FirstPageCache = {
   viewer: string;
-  pages: Partial<Record<OpportunityType, CachedPage>>;
-  requests: Partial<Record<OpportunityType, Promise<OpportunityPage>>>;
+  pages: Partial<Record<string, CachedPage>>;
+  requests: Partial<Record<string, Promise<OpportunityPage>>>;
 };
 const CACHE_FRESH_MS = 60_000;
 const inactiveTabColour = "#E8EEF4";
+const sortOptions = [
+  { value: "hot", label: "Hottest" },
+  { value: "new", label: "Newest" },
+  { value: "discussed", label: "Most discussed" },
+] as const;
+const cacheKey = (tab: OpportunityType, order: OpportunitySort) => `${tab}:${order}`;
 
 export default function DiscoverScreen() {
   const { feed, loading, error, refresh, action, signedIn } = useApp();
   const viewer = feed?.user?.id ?? "guest";
   const [type, setType] = useState<OpportunityType>("Earn");
+  const [sort, setSort] = useState<OpportunitySort>("hot");
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [showExpired, setShowExpired] = useState(false);
@@ -61,27 +68,28 @@ export default function DiscoverScreen() {
     return firstPages.current;
   }, [viewer]);
 
-  const defaultPage = useCallback((tab: OpportunityType, force = false): Promise<OpportunityPage> => {
+  const defaultPage = useCallback((tab: OpportunityType, order: OpportunitySort, force = false): Promise<OpportunityPage> => {
     const cache = currentCache();
-    if (!force && cache.pages[tab]) return Promise.resolve(cache.pages[tab].page);
-    if (!force && cache.requests[tab]) return cache.requests[tab];
-    const request = getOpportunities({ type: tab }).then((page) => {
-      if (firstPages.current === cache && cache.requests[tab] === request) {
-        cache.pages[tab] = { page, loadedAt: Date.now() };
+    const key = cacheKey(tab, order);
+    if (!force && cache.pages[key]) return Promise.resolve(cache.pages[key].page);
+    if (!force && cache.requests[key]) return cache.requests[key];
+    const request = getOpportunities({ type: tab, sort: order }).then((page) => {
+      if (firstPages.current === cache && cache.requests[key] === request) {
+        cache.pages[key] = { page, loadedAt: Date.now() };
       }
       return page;
     }).finally(() => {
-      if (firstPages.current === cache && cache.requests[tab] === request) {
-        delete cache.requests[tab];
+      if (firstPages.current === cache && cache.requests[key] === request) {
+        delete cache.requests[key];
       }
     });
-    cache.requests[tab] = request;
+    cache.requests[key] = request;
     return request;
   }, [currentCache]);
 
   const updateCachedVote = useCallback((updated: Opportunity) => {
     const cache = currentCache();
-    for (const tab of types) {
+    for (const tab of Object.keys(cache.pages)) {
       const entry = cache.pages[tab];
       if (entry) {
         cache.pages[tab] = {
@@ -105,7 +113,7 @@ export default function DiscoverScreen() {
     const current = ++generation.current;
     setPageError("");
     const isDefault = category === "All" && !search && !showExpired;
-    const cached = isDefault ? currentCache().pages[type] : undefined;
+    const cached = isDefault ? currentCache().pages[cacheKey(type, sort)] : undefined;
     if (cached) {
       setItems(cached.page.items);
       setNextOffset(cached.page.nextOffset);
@@ -123,8 +131,8 @@ export default function DiscoverScreen() {
     firstPageRefreshing.current = true;
     try {
       const page = isDefault
-        ? await defaultPage(type, force || !!cached)
-        : await getOpportunities({ type, category, query: search, showExpired });
+        ? await defaultPage(type, sort, force || !!cached)
+        : await getOpportunities({ type, category, query: search, showExpired, sort });
       if (current !== generation.current) return;
       setItems(page.items);
       setNextOffset(page.nextOffset);
@@ -139,14 +147,14 @@ export default function DiscoverScreen() {
         setPageLoading(false);
       }
     }
-  }, [type, category, search, showExpired, currentCache, defaultPage]);
+  }, [type, category, search, showExpired, sort, currentCache, defaultPage]);
 
   useEffect(() => { void loadFirst(); return () => { generation.current += 1; }; }, [loadFirst]);
 
   useEffect(() => {
     // Only the first 20 of each tab are prefetched; subsequent pages remain on-demand.
-    for (const tab of types) void defaultPage(tab).catch(() => {});
-  }, [defaultPage]);
+    for (const tab of types) void defaultPage(tab, sort).catch(() => {});
+  }, [defaultPage, sort]);
 
   const loadMore = useCallback(async () => {
     if (nextOffset === null || pageLoading || firstPageRefreshing.current || loadingMore.current || pageError) return;
@@ -154,7 +162,7 @@ export default function DiscoverScreen() {
     setMoreLoading(true);
     const current = generation.current;
     try {
-      const page = await getOpportunities({ type, category, query: search, showExpired, offset: nextOffset });
+      const page = await getOpportunities({ type, category, query: search, showExpired, sort, offset: nextOffset });
       if (current !== generation.current) return;
       setItems((previous) => [...previous, ...page.items.filter((item) => !previous.some((old) => old.id === item.id))]);
       setNextOffset(page.nextOffset);
@@ -164,7 +172,7 @@ export default function DiscoverScreen() {
       loadingMore.current = false;
       setMoreLoading(false);
     }
-  }, [nextOffset, pageLoading, pageError, type, category, search, showExpired]);
+  }, [nextOffset, pageLoading, pageError, type, category, search, showExpired, sort]);
 
   const loadHidden = useCallback(async (offset = 0) => {
     if (hiddenLoading) return;
@@ -200,7 +208,7 @@ export default function DiscoverScreen() {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => <OpportunityCard item={item} onVoteChange={updateCachedVote} onHidden={() => {
           const cache = currentCache();
-          for (const tab of types) {
+          for (const tab of Object.keys(cache.pages)) {
             const entry = cache.pages[tab];
             if (entry) cache.pages[tab] = { ...entry, page: { ...entry.page, items: entry.page.items.filter((post) => post.id !== item.id) } };
           }
@@ -235,7 +243,7 @@ export default function DiscoverScreen() {
             key={item}
             onPress={() => {
               listRef.current?.scrollToOffset({ offset: 0, animated: false });
-              const cached = !search && !query.trim() && !showExpired ? currentCache().pages[item] : undefined;
+              const cached = !search && !query.trim() && !showExpired ? currentCache().pages[cacheKey(item, sort)] : undefined;
               if (cached) {
                 setItems(cached.page.items);
                 setNextOffset(cached.page.nextOffset);
@@ -289,6 +297,32 @@ export default function DiscoverScreen() {
           </Pressable>
         ))}
       </ScrollView>
+      <View style={styles.sortSection}>
+        <Text style={styles.expiredLabel}>Sort listings</Text>
+        <View style={styles.sortOptions}>
+          {sortOptions.map((option) => (
+            <Pressable
+              key={option.value}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort by ${option.label.toLowerCase()}`}
+              accessibilityState={{ selected: sort === option.value }}
+              onPress={() => {
+                if (sort === option.value) return;
+                generation.current += 1;
+                setNextOffset(null);
+                setItems([]);
+                setPageError("");
+                setPageLoading(true);
+                listRef.current?.scrollToOffset({ offset: 0, animated: false });
+                setSort(option.value);
+              }}
+              style={[styles.sortButton, sort === option.value && styles.sortActive]}
+            >
+              <Text style={[styles.chipText, sort === option.value && styles.sortTextActive]}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: showExpired }}
@@ -337,6 +371,11 @@ export default function DiscoverScreen() {
 }
 
 const styles = StyleSheet.create({
+  sortSection: { gap: 8 },
+  sortOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  sortButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: colours.line, borderRadius: radius.pill, backgroundColor: inactiveTabColour },
+  sortActive: { backgroundColor: colours.navy, borderColor: colours.navy },
+  sortTextActive: { color: colours.surface },
   hiddenSection: { gap: 10, paddingVertical: 14 },
   feedContent: { padding: spacing.lg, paddingBottom: 110 },
   controls: { gap: spacing.lg, marginBottom: spacing.lg },
