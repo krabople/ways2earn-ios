@@ -5,7 +5,7 @@ permissions:
   contents: read
 jobs:
   quizfolk:
-    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@dcb5193b7e4b87fe6a24b6913c90e24bf0a593a3
+    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@dcb51932bbdf7a135418a28103a248e1cda7da45
     secrets:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
