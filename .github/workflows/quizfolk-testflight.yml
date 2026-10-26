@@ -1,0 +1,15 @@
+name: Quizfolk TestFlight
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quizfolk:
+    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@dcb5193b7e4b87fe6a24b6913c90e24bf0a593a3
+    secrets:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+      BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+      P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
