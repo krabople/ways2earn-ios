@@ -5,14 +5,14 @@ permissions:
   contents: read
 jobs:
   verify_ios:
-    uses: krabople/Quizfolk-iOS/.github/workflows/ios.yml@42cec05b5b9cec914c422c3a335ed59addf01df8
+    uses: krabople/Quizfolk-iOS/.github/workflows/ios.yml@4469bc129c929552fb04cd0c4631a70932f2d339
     with:
-      source_ref: 42cec05b5b9cec914c422c3a335ed59addf01df8
+      source_ref: 4469bc129c929552fb04cd0c4631a70932f2d339
   quizfolk:
     needs: verify_ios
-    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@42cec05b5b9cec914c422c3a335ed59addf01df8
+    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@4469bc129c929552fb04cd0c4631a70932f2d339
     with:
-      source_ref: 42cec05b5b9cec914c422c3a335ed59addf01df8
+      source_ref: 4469bc129c929552fb04cd0c4631a70932f2d339
     secrets:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
