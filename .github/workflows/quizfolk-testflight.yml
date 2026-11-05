@@ -3,18 +3,22 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 jobs:
   verify_ios:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - name: Verify the successful tests for this exact source revision
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
-          import json, urllib.request, time
+          import json, urllib.request, time, os
           deadline=time.monotonic()+1600
           while time.monotonic()<deadline:
-              with urllib.request.urlopen('https://api.github.com/repos/krabople/Quizfolk-iOS/actions/runs/42079782281',timeout=30) as r:
+              request=urllib.request.Request('https://api.github.com/repos/krabople/Quizfolk-iOS/actions/runs/42079782281',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'Quizfolk-release-check'})
+              with urllib.request.urlopen(request,timeout=30) as r:
                   result=json.load(r)
               assert result['head_sha']=='88a3dc0f201f029660b875b0b60b53386d94974d', 'Unexpected iOS source revision'
               if result['status']=='completed':
