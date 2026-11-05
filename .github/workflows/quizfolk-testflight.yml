@@ -5,14 +5,22 @@ permissions:
   contents: read
 jobs:
   verify_ios:
-    uses: krabople/Quizfolk-iOS/.github/workflows/ios.yml@4469bc129c929552fb04cd0c4631a70932f2d339
-    with:
-      source_ref: 4469bc129c929552fb04cd0c4631a70932f2d339
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify the successful tests for this exact source revision
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request
+          with urllib.request.urlopen('https://api.github.com/repos/krabople/Quizfolk-iOS/actions/runs/42079782281') as r:
+              result=json.load(r)
+          assert result['head_sha']=='88a3dc0f201f029660b875b0b60b53386d94974d' and result['status']=='completed' and result['conclusion']=='success', 'The exact iOS source must pass its simulator checks before signing'
+          print('Exact iOS source passed all simulator tests')
+          PY
   quizfolk:
     needs: verify_ios
-    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@4469bc129c929552fb04cd0c4631a70932f2d339
+    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@88a3dc0f201f029660b875b0b60b53386d94974d
     with:
-      source_ref: 4469bc129c929552fb04cd0c4631a70932f2d339
+      source_ref: 88a3dc0f201f029660b875b0b60b53386d94974d
     secrets:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
