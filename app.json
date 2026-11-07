@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ways2Earn",
     "slug": "ways2earn-ios",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ways2earn",
@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.krabople.ways2earn",
-      "buildNumber": "26",
+      "buildNumber": "27",
       "usesAppleSignIn": true,
       "supportsTablet": true,
       "infoPlist": {
