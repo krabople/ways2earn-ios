@@ -1,0 +1,245 @@
+name: ScreenShuffle TestFlight
+
+# This same file is installed as screenshuffle-testflight.yml in the existing
+# signing repository. Only the app's private repository is checked out below.
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Exact reviewed 40-character ScreenShuffle source commit
+        required: true
+        type: string
+      mode:
+        description: Build/upload, register bundle only, or verify an existing upload
+        type: choice
+        options: [build, register, verify]
+        default: build
+      upload:
+        description: Upload the signed IPA and add Ben to internal testing
+        type: boolean
+        default: true
+      build_number:
+        description: iOS build number (required in verify mode; otherwise run number)
+        type: string
+        required: false
+  push:
+    branches: [codex/screenshuffle-release]
+    paths: [.github/workflows/screenshuffle-testflight.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenshuffle-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: ScreenShuffle (${{ matrix.variant }})
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [public, personal]
+    runs-on: macos-26
+    timeout-minutes: 110
+    env:
+      CI: '1'
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      RELEASE_MODE: ${{ inputs.mode || 'build' }}
+      SCREENSHUFFLE_SOURCE_REF: ${{ inputs.source_ref || 'f250253d69e55b81aebd706a472705abc168cf9f' }}
+      SCREENSHUFFLE_BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
+      EXPLICIT_BUILD_NUMBER: ${{ inputs.build_number }}
+      UPLOAD_REQUESTED: ${{ github.event_name == 'push' || inputs.upload }}
+      SCREENSHUFFLE_VARIANT: ${{ matrix.variant }}
+    steps:
+      - name: Validate release inputs
+        run: |
+          set -euo pipefail
+          [[ "$SCREENSHUFFLE_SOURCE_REF" =~ ^[a-f0-9]{40}$ ]] || { echo 'An exact source commit is required'; exit 1; }
+          [[ "$SCREENSHUFFLE_BUILD_NUMBER" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || { echo 'Invalid build number'; exit 1; }
+          if [ "$RELEASE_MODE" = 'verify' ] && [ -z "$EXPLICIT_BUILD_NUMBER" ]; then echo 'Verify mode requires the exact uploaded build number'; exit 1; fi
+          test -n "$ASC_KEY_ID" && test -n "$ASC_ISSUER_ID" && test -n "$APPLE_TEAM_ID"
+
+      - name: Check out private ScreenShuffle source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: krabople/ScreenShuffle-iOS
+          ref: ${{ env.SCREENSHUFFLE_SOURCE_REF }}
+          ssh-key: ${{ secrets.SCREENSHUFFLE_SOURCE_SSH_KEY }}
+          persist-credentials: false
+
+      - name: Reject personal data in source
+        run: |
+          node --test scripts/release/test-source-guard.mjs
+          node scripts/release/guard-source.mjs
+
+      - name: Prepare Apple API runtime
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+
+      - name: Install pinned Apple API dependencies
+        run: |
+          python3 -m venv "$RUNNER_TEMP/screenshuffle-apple"
+          "$RUNNER_TEMP/screenshuffle-apple/bin/pip" --quiet install -r scripts/release/requirements.txt
+          "$RUNNER_TEMP/screenshuffle-apple/bin/python" scripts/release/test_release.py
+
+      - name: Register the dedicated bundle identifier
+        if: env.RELEASE_MODE == 'register'
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+        run: '"$RUNNER_TEMP/screenshuffle-apple/bin/python" scripts/release/apple_release.py register'
+
+      - name: Verify the dedicated App Store Connect app record
+        if: env.RELEASE_MODE != 'register'
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+        run: '"$RUNNER_TEMP/screenshuffle-apple/bin/python" scripts/release/apple_release.py require-app'
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        if: env.RELEASE_MODE == 'build'
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Validate app source
+        if: env.RELEASE_MODE == 'build'
+        run: |
+          npm ci
+          npm run lint
+          npm run typecheck
+          npm test
+          npx --yes expo-doctor
+          node scripts/release/prepare-build.mjs
+
+      - name: Export production iOS JavaScript and assets
+        if: env.RELEASE_MODE == 'build'
+        run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/screenshuffle-js" --clear
+
+      - name: Select the Expo SDK 57 compatible Xcode
+        if: env.RELEASE_MODE == 'build'
+        run: |
+          test -d /Applications/Xcode_26.6.app
+          sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Generate native iOS project
+        if: env.RELEASE_MODE == 'build'
+        run: |
+          npx expo prebuild --platform ios --clean --no-install
+          cd ios
+          pod install --repo-update
+          test -d "${SCREENSHUFFLE_SCHEME}.xcworkspace"
+
+      - name: Prepare ephemeral signing keychain
+        if: env.RELEASE_MODE == 'build'
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$ASC_API_KEY_BASE64" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/screenshuffle-distribution.p12"
+          chmod 600 "$RUNNER_TEMP/screenshuffle-distribution.p12"
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 24)
+          echo "::add-mask::$KEYCHAIN_PASSWORD"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/screenshuffle.keychain-db"
+          security set-keychain-settings -lut 21600 "$RUNNER_TEMP/screenshuffle.keychain-db"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/screenshuffle.keychain-db"
+          security import "$RUNNER_TEMP/screenshuffle-distribution.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$RUNNER_TEMP/screenshuffle.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/screenshuffle.keychain-db"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -k "$KEYCHAIN_PASSWORD" "$RUNNER_TEMP/screenshuffle.keychain-db" >/dev/null
+
+      - name: Provision only ScreenShuffle using the existing certificate
+        if: env.RELEASE_MODE == 'build'
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        run: '"$RUNNER_TEMP/screenshuffle-apple/bin/python" scripts/release/apple_release.py provision'
+
+      - name: Archive signed iOS app
+        if: env.RELEASE_MODE == 'build'
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace "ios/${SCREENSHUFFLE_SCHEME}.xcworkspace" \
+            -scheme "$SCREENSHUFFLE_SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/ScreenShuffle.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CURRENT_PROJECT_VERSION="$SCREENSHUFFLE_BUILD_NUMBER" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY='Apple Distribution' \
+            PROVISIONING_PROFILE_SPECIFIER="$SCREENSHUFFLE_PROFILE_NAME" \
+            clean archive > "$RUNNER_TEMP/screenshuffle-build.log" 2>&1 || { tail -160 "$RUNNER_TEMP/screenshuffle-build.log"; exit 1; }
+
+      - name: Verify archive identity and absence of personal data
+        if: env.RELEASE_MODE == 'build'
+        run: |
+          set -euo pipefail
+          APP_PATH="$RUNNER_TEMP/ScreenShuffle.xcarchive/Products/Applications/${SCREENSHUFFLE_SCHEME}.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")" = "$SCREENSHUFFLE_BUNDLE_ID"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Info.plist")" = "$SCREENSHUFFLE_BUILD_NUMBER"
+          if find "$APP_PATH" -type f \( -iname '*.sqlite' -o -iname '*.sqlite3' -o -iname '*.db' -o -iname '*.tsv' -o -iname '*.tsv.gz' \) -print -quit | grep -q .; then
+            echo 'A data file was unexpectedly bundled; upload stopped.'
+            exit 1
+          fi
+
+      - name: Export signed IPA
+        if: env.RELEASE_MODE == 'build'
+        run: |
+          cat > "$RUNNER_TEMP/ScreenShuffle-ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>uploadSymbols</key><true/>
+            <key>provisioningProfiles</key><dict>
+              <key>${SCREENSHUFFLE_BUNDLE_ID}</key><string>${SCREENSHUFFLE_PROFILE_NAME}</string>
+            </dict>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/ScreenShuffle.xcarchive" \
+            -exportPath "$RUNNER_TEMP/screenshuffle-export" \
+            -exportOptionsPlist "$RUNNER_TEMP/ScreenShuffle-ExportOptions.plist" \
+            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload to App Store Connect
+        if: env.RELEASE_MODE == 'build' && env.UPLOAD_REQUESTED == 'true'
+        run: |
+          xcrun altool --upload-app --type ios \
+            --file "$RUNNER_TEMP/screenshuffle-export/${SCREENSHUFFLE_SCHEME}.ipa" \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+      - name: Verify Apple processing and Ben's internal testing access
+        if: env.RELEASE_MODE == 'verify' || (env.RELEASE_MODE == 'build' && env.UPLOAD_REQUESTED == 'true')
+        env:
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+        run: '"$RUNNER_TEMP/screenshuffle-apple/bin/python" scripts/release/apple_release.py verify --build "$SCREENSHUFFLE_BUILD_NUMBER"'
+
+      - name: Preserve non-secret release report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ScreenShuffle-${{ matrix.variant }}-release-report-${{ github.run_id }}
+          path: release-output/*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Remove ephemeral signing material
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/screenshuffle.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/screenshuffle-distribution.p12" "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
