@@ -47,10 +47,10 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      RELEASE_MODE: ${{ inputs.mode || 'verify' }}
-      SCREENSHUFFLE_SOURCE_REF: ${{ inputs.source_ref || '8772243f9060a697515b7cfdd79611df61a14761' }}
-      SCREENSHUFFLE_BUILD_NUMBER: ${{ inputs.build_number || '1' }}
-      EXPLICIT_BUILD_NUMBER: ${{ inputs.build_number || '1' }}
+      RELEASE_MODE: ${{ inputs.mode || 'build' }}
+      SCREENSHUFFLE_SOURCE_REF: ${{ inputs.source_ref || '61fc9493429d0addf459ba1611b485d3c6ab4c17' }}
+      SCREENSHUFFLE_BUILD_NUMBER: ${{ inputs.build_number || '2' }}
+      EXPLICIT_BUILD_NUMBER: ${{ inputs.build_number || '2' }}
       UPLOAD_REQUESTED: ${{ github.event_name == 'push' || inputs.upload }}
       SCREENSHUFFLE_VARIANT: ${{ matrix.variant }}
     steps:
@@ -72,7 +72,7 @@ jobs:
 
       - name: Reject personal data in source
         run: |
-          node --test scripts/release/test-source-guard.mjs
+          node --test scripts/release/test-source-guard.mjs scripts/release/test-native-config.mjs
           node scripts/release/guard-source.mjs
 
       - name: Prepare Apple API runtime
@@ -187,6 +187,7 @@ jobs:
           APP_PATH="$RUNNER_TEMP/ScreenShuffle.xcarchive/Products/Applications/${SCREENSHUFFLE_SCHEME}.app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_PATH/Info.plist")" = "$SCREENSHUFFLE_BUNDLE_ID"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_PATH/Info.plist")" = "$SCREENSHUFFLE_BUILD_NUMBER"
+          node scripts/release/verify-native-config.mjs "$APP_PATH"
           if find "$APP_PATH" -type f \( -iname '*.sqlite' -o -iname '*.sqlite3' -o -iname '*.db' -o -iname '*.tsv' -o -iname '*.tsv.gz' \) -print -quit | grep -q .; then
             echo 'A data file was unexpectedly bundled; upload stopped.'
             exit 1
