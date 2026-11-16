@@ -47,10 +47,10 @@ jobs:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      RELEASE_MODE: ${{ inputs.mode || 'build' }}
-      SCREENSHUFFLE_SOURCE_REF: ${{ inputs.source_ref || 'f250253d69e55b81aebd706a472705abc168cf9f' }}
-      SCREENSHUFFLE_BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
-      EXPLICIT_BUILD_NUMBER: ${{ inputs.build_number }}
+      RELEASE_MODE: ${{ inputs.mode || 'verify' }}
+      SCREENSHUFFLE_SOURCE_REF: ${{ inputs.source_ref || '8772243f9060a697515b7cfdd79611df61a14761' }}
+      SCREENSHUFFLE_BUILD_NUMBER: ${{ inputs.build_number || '1' }}
+      EXPLICIT_BUILD_NUMBER: ${{ inputs.build_number || '1' }}
       UPLOAD_REQUESTED: ${{ github.event_name == 'push' || inputs.upload }}
       SCREENSHUFFLE_VARIANT: ${{ matrix.variant }}
     steps:
