@@ -17,10 +17,10 @@ jobs:
           import json, urllib.request, time, os
           deadline=time.monotonic()+1600
           while time.monotonic()<deadline:
-              request=urllib.request.Request('https://api.github.com/repos/krabople/Quizfolk-iOS/actions/runs/44284444049',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'Quizfolk-release-check'})
+              request=urllib.request.Request('https://api.github.com/repos/krabople/Quizfolk-iOS/actions/runs/44426546496',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'Quizfolk-release-check'})
               with urllib.request.urlopen(request,timeout=30) as r:
                   result=json.load(r)
-              assert result['head_sha']=='449c25a6b47b4f41e32b51bbfcd948d13bdc5e90', 'Unexpected iOS source revision'
+              assert result['head_sha']=='068b4f42b5aaff697eaacee2ce4e2aa3b4547188', 'Unexpected iOS source revision'
               if result['status']=='completed':
                   assert result['conclusion']=='success', 'The exact iOS source must pass all simulator checks before signing'
                   print('Exact iOS source passed all simulator tests');break
@@ -29,9 +29,9 @@ jobs:
           PY
   quizfolk:
     needs: verify_ios
-    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@449c25a6b47b4f41e32b51bbfcd948d13bdc5e90
+    uses: krabople/Quizfolk-iOS/.github/workflows/testflight.yml@068b4f42b5aaff697eaacee2ce4e2aa3b4547188
     with:
-      source_ref: 449c25a6b47b4f41e32b51bbfcd948d13bdc5e90
+      source_ref: 068b4f42b5aaff697eaacee2ce4e2aa3b4547188
     secrets:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
